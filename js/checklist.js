@@ -1,35 +1,32 @@
-// checklist.js — the tap-first guided wizard, one decision per screen.
+// checklist.js — the readiness check (Part 0), one decision per screen.
 //
-// Renders the ordered steps from the inlined data.checklist as a stepper: one
-// question is presented at a time with Back / Next controls, answered steps
-// collapse to a compact editable summary, and an always-visible "N of 7
-// answered" counter gives durable, return-recognised progress. Each answer is
-// written straight into reportDraft.answers, persisted through store.save (a
-// no-op unless the user opted in to on-device saving), and announced via a
-// 'draft:changed' CustomEvent so the Assembled Draft and Transfer Mode re-render.
+// REPURPOSED in IP-2: this module no longer re-collects the IRAS form's simple
+// structured fields as prose. It renders the tap-first READINESS CHECK — a fast
+// verification that the reader actually holds each piece the form will ask for —
+// and doubles as the advisory gate (see js/gate.js). One item per internal step,
+// reusing the stepper: single-select items are a WAI-ARIA radiogroup, multi-
+// select items are distinct checkbox-style chips, and "verify" items are a
+// three-button radiogroup ("I have this / Not sure / No") stored as
+// have | unsure | no.
 //
-// Single-select steps (chips / radio) implement the WAI-ARIA radio pattern —
-// one tab stop, arrow keys move-and-select, roving tabindex to the checked
-// option. Multi-select steps use distinct checkbox-style ticks so pick-one and
-// pick-many never look the same. Every control is a real <button> clearing the
-// ~44px tap floor and reachable by keyboard and assistive tech.
+// Every answer is written into draft.readiness.answers[item.id], persisted
+// through store.save (a no-op unless on-device saving is on), reported via
+// onChange('readiness.'+id, value), and announced with a 'draft:changed' event.
 //
-// Contract: export function renderChecklist(rootEl, draft, onChange) -> void
-// (also re-exports answeredCount for callers that want the count without DOM).
+// Contract (UNCHANGED): export function renderChecklist(rootEl, draft, onChange)
 
-import { checklist, fragmentFor } from './data.js';
-import { answeredCount, ANSWER_FIELDS } from './state.js';
+import { readiness } from './data.js';
+import {
+  readinessCrucialAnswered,
+  evaluateGate,
+} from './gate.js';
 import * as store from './store.js';
-import { showScreen } from './router.js';
+import { showScreen, setControls, getScreen } from './router.js';
 
-export { answeredCount };
-
-function ensureAnswers(draft) {
-  if (!draft.answers || typeof draft.answers !== 'object') {
-    draft.answers = {};
-  }
-  return draft.answers;
-}
+// Latest control-applier closure (over the current draft) + a once-only listener
+// so re-renders never stack duplicate 'screen:changed' handlers.
+let applyReadinessControls = null;
+let listenerBound = false;
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -43,71 +40,94 @@ function announce(message) {
   if (live) live.textContent = message;
 }
 
-// Is a single step answered? Mirrors state.answeredCount's per-field rule.
-function stepAnswered(draft, step) {
-  const val = draft.answers[step.field];
-  if (step.inputType === 'multiselect') {
-    return Array.isArray(val) && val.length > 0;
+function ensureReadiness(draft) {
+  if (!draft.readiness || typeof draft.readiness !== 'object') {
+    draft.readiness = { answers: {}, gate: { evaluated: false, passed: null, acknowledgedRedirect: false } };
   }
+  if (!draft.readiness.answers || typeof draft.readiness.answers !== 'object') {
+    draft.readiness.answers = {};
+  }
+  return draft.readiness.answers;
+}
+
+// Verify items map three display labels to the canonical have/unsure/no values.
+// A select item's value is its own label.
+function optionsFor(item) {
+  if (item.kind === 'verify') {
+    const labels =
+      Array.isArray(item.options) && item.options.length === 3
+        ? item.options
+        : ['I have this', 'Not sure', 'No'];
+    const values = ['have', 'unsure', 'no'];
+    return labels.map((label, i) => ({ value: values[i], label }));
+  }
+  const opts = Array.isArray(item.options) ? item.options : [];
+  return opts.map((o) => ({ value: o, label: o }));
+}
+
+function itemAnswered(draft, item) {
+  const val = draft.readiness.answers[item.id];
+  if (item.multi) return Array.isArray(val) && val.length > 0;
   return val != null && String(val).trim() !== '';
 }
 
-// A short, human summary of a step's current answer for the collapsed row.
-function summaryValue(draft, step) {
-  const val = draft.answers[step.field];
+// Count of answered readiness items (durable, return-recognised progress).
+function answeredReadinessCount(draft) {
+  const items = (readiness && readiness.items) || [];
+  return items.reduce((n, it) => (itemAnswered(draft, it) ? n + 1 : n), 0);
+}
+
+// Short human summary of an answer for the collapsed "answered so far" row.
+function summaryValue(draft, item) {
+  const val = draft.readiness.answers[item.id];
+  if (item.kind === 'verify') {
+    const pair = optionsFor(item).find((o) => o.value === val);
+    return pair ? pair.label : '';
+  }
   if (Array.isArray(val)) return val.join(', ');
   return val == null ? '' : String(val);
 }
 
-// --- single-select: WAI-ARIA radio pattern --------------------------------
-// Applies to BOTH chips and radio inputType (both are single-choice). Visual
-// treatment differs (pill vs full-width row) but the semantics and keyboard
-// model are the correct radiogroup pattern.
-function renderSingleChoice(stepEl, step, draft, commit, promptId, hintId) {
-  const isRadio = step.inputType === 'radio';
-  const cls = isRadio ? 'checklist__radio' : 'checklist__chip';
-
+// --- single-select (select-single AND verify): WAI-ARIA radio pattern -------
+function renderSingleChoice(stepEl, item, draft, commit, promptId, hintId) {
   const wrap = el('div', 'checklist__options');
   wrap.setAttribute('role', 'radiogroup');
   if (promptId) wrap.setAttribute('aria-labelledby', promptId);
   if (hintId) wrap.setAttribute('aria-describedby', hintId);
 
-  const options = Array.isArray(step.options) ? step.options : [];
+  const pairs = optionsFor(item);
   const buttons = [];
-
-  const current = () => draft.answers[step.field];
+  const current = () => draft.readiness.answers[item.id];
 
   function refresh() {
     const cur = current();
-    let checkedIdx = options.indexOf(cur);
+    let checkedIdx = pairs.findIndex((p) => p.value === cur);
     buttons.forEach((btn, i) => {
-      const selected = options[i] === cur;
-      btn.classList.toggle(cls + '--selected', selected);
+      const selected = pairs[i].value === cur;
+      btn.classList.toggle('checklist__radio--selected', selected);
       btn.setAttribute('aria-checked', selected ? 'true' : 'false');
-      // Roving tabindex: the checked option is the single tab stop; if nothing
-      // is checked, the first option is.
       const rove = checkedIdx === -1 ? 0 : checkedIdx;
       btn.tabIndex = i === rove ? 0 : -1;
     });
   }
 
   function move(fromIdx, delta) {
-    if (!options.length) return;
-    const nextIdx = (fromIdx + delta + options.length) % options.length;
-    commit(step.field, options[nextIdx]); // arrow always selects, never clears
+    if (!pairs.length) return;
+    const nextIdx = (fromIdx + delta + pairs.length) % pairs.length;
+    commit(item.id, pairs[nextIdx].value); // arrow always selects, never clears
     refresh();
     buttons[nextIdx].focus();
   }
 
-  options.forEach((opt, i) => {
-    const btn = el('button', cls, opt);
+  pairs.forEach((pair, i) => {
+    const btn = el('button', 'checklist__radio', pair.label);
     btn.type = 'button';
     btn.setAttribute('role', 'radio');
     btn.addEventListener('click', () => {
-      // Click toggles: re-tapping the selected option clears it, so a phone
-      // mis-tap is easy to undo.
-      const next = current() === opt ? null : opt;
-      commit(step.field, next);
+      // Re-tapping the selected option clears it, so a phone mis-tap is easy to
+      // undo.
+      const next = current() === pair.value ? null : pair.value;
+      commit(item.id, next);
       refresh();
     });
     btn.addEventListener('keydown', (e) => {
@@ -133,33 +153,33 @@ function renderSingleChoice(stepEl, step, draft, commit, promptId, hintId) {
   stepEl.appendChild(wrap);
 }
 
-// --- multi-select: distinct checkbox-style toggles ------------------------
-function renderMultiSelect(stepEl, step, draft, commit, promptId, hintId) {
+// --- multi-select: distinct checkbox-style toggles --------------------------
+function renderMultiSelect(stepEl, item, draft, commit, promptId, hintId) {
   const wrap = el('div', 'checklist__multiselect');
   wrap.setAttribute('role', 'group');
   if (promptId) wrap.setAttribute('aria-labelledby', promptId);
   if (hintId) wrap.setAttribute('aria-describedby', hintId);
 
-  if (!Array.isArray(draft.answers[step.field])) {
-    draft.answers[step.field] = [];
+  if (!Array.isArray(draft.readiness.answers[item.id])) {
+    draft.readiness.answers[item.id] = [];
   }
 
-  const options = Array.isArray(step.options) ? step.options : [];
+  const options = Array.isArray(item.options) ? item.options : [];
 
   options.forEach((opt) => {
-    const selected = draft.answers[step.field].includes(opt);
+    const selected = draft.readiness.answers[item.id].includes(opt);
     const btn = el('button', 'checklist__chip checklist__chip--multi', opt);
     btn.type = 'button';
     btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
     if (selected) btn.classList.add('checklist__chip--checked');
     btn.addEventListener('click', () => {
-      const cur = Array.isArray(draft.answers[step.field])
-        ? draft.answers[step.field].slice()
+      const cur = Array.isArray(draft.readiness.answers[item.id])
+        ? draft.readiness.answers[item.id].slice()
         : [];
       const idx = cur.indexOf(opt);
       if (idx === -1) cur.push(opt);
       else cur.splice(idx, 1);
-      commit(step.field, cur);
+      commit(item.id, cur);
       const on = cur.includes(opt);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       btn.classList.toggle('checklist__chip--checked', on);
@@ -170,37 +190,30 @@ function renderMultiSelect(stepEl, step, draft, commit, promptId, hintId) {
   stepEl.appendChild(wrap);
 }
 
-// Build the interactive body (prompt + hint + options) for one step.
-function buildStepBody(step, draft, commit, index, total) {
+// Build the interactive body (counter + prompt + hint + options) for one item.
+function buildStepBody(item, draft, commit, index, total) {
   const stepEl = el('div', 'checklist__step is-active');
-  stepEl.dataset.field = step.field;
+  stepEl.dataset.item = item.id;
 
-  const counter = el(
-    'p',
-    'checklist__step-counter',
-    'Step ' + (index + 1) + ' of ' + total
+  stepEl.appendChild(
+    el('p', 'checklist__step-counter', 'Step ' + (index + 1) + ' of ' + total)
   );
-  stepEl.appendChild(counter);
 
-  const promptId = 'checklist-prompt-' + (step.id || step.field);
-  const prompt = el('p', 'checklist__prompt', step.prompt || '');
+  const promptId = 'readiness-prompt-' + item.id;
+  const prompt = el('p', 'checklist__prompt', item.prompt || '');
   prompt.id = promptId;
   stepEl.appendChild(prompt);
 
-  const isMulti = step.inputType === 'multiselect';
   const hintId = promptId + '-hint';
-  const hint = el(
-    'p',
-    'checklist__hint',
-    isMulti ? 'Pick any that apply' : 'Pick one'
-  );
+  const defaultHint = item.multi ? 'Pick any that apply' : 'Pick one';
+  const hint = el('p', 'checklist__hint', item.hint || defaultHint);
   hint.id = hintId;
   stepEl.appendChild(hint);
 
-  if (isMulti) {
-    renderMultiSelect(stepEl, step, draft, commit, promptId, hintId);
+  if (item.multi) {
+    renderMultiSelect(stepEl, item, draft, commit, promptId, hintId);
   } else {
-    renderSingleChoice(stepEl, step, draft, commit, promptId, hintId);
+    renderSingleChoice(stepEl, item, draft, commit, promptId, hintId);
   }
 
   return stepEl;
@@ -208,34 +221,38 @@ function buildStepBody(step, draft, commit, index, total) {
 
 /**
  * renderChecklist(rootEl, draft, onChange)
- * Draws the whole stepper into rootEl (#checklist). For every answer it mutates
- * draft.answers, persists through store.save (no-op unless persistence is on),
- * calls onChange(field, value) if provided, and dispatches 'draft:changed'.
+ * Draws the whole readiness stepper into rootEl (#checklist). Each answer mutates
+ * draft.readiness.answers, persists through store.save, calls
+ * onChange('readiness.'+id, value), and dispatches 'draft:changed'.
  */
 export function renderChecklist(rootEl, draft, onChange) {
   if (!rootEl) return;
-  ensureAnswers(draft);
+  ensureReadiness(draft);
   rootEl.textContent = '';
 
-  const steps = (checklist && Array.isArray(checklist.steps) ? checklist.steps : [])
-    .filter((s) => s && s.field);
-  const total = steps.length;
+  const items = (readiness && Array.isArray(readiness.items) ? readiness.items : [])
+    .filter((it) => it && it.id);
+  const total = items.length;
+  const part = (readiness && readiness.part) || { name: 'Part 0: Readiness', estimate: '~3 mins' };
 
-  // --- header (single-sourced from JS, TRD-12) ---------------------------
-  rootEl.appendChild(el('p', 'eyebrow', 'Guided checklist'));
-  const heading = el('h2', null, 'Build your report, one tap at a time');
+  // --- timeboxed header (single-sourced from data.js) --------------------
+  rootEl.appendChild(el('p', 'eyebrow', 'Readiness check'));
+  const heading = el('h2', null, part.name + ' — ' + part.estimate);
   heading.id = 'checklist-heading';
-  heading.tabIndex = -1; // TRD-8 focus target on view switch
+  heading.tabIndex = -1; // focus target on screen switch (router)
   rootEl.appendChild(heading);
+  rootEl.appendChild(
+    el('p', 'part__timebox', 'About ' + part.estimate.replace(/[~]/g, '').trim() + ' — you tap, you don’t type.')
+  );
   rootEl.appendChild(
     el(
       'p',
       'checklist__intro',
-      'You choose from the options; the app writes the report. Answer one question, then tap Next — you can stop and come back any time.'
+      'The form already collects the simple choices itself. This quick check just confirms you have what it will ask for — nothing here is typed into the form or sent anywhere.'
     )
   );
 
-  // --- progress counter (always visible, TRD-11) -------------------------
+  // --- progress counter (always visible) ---------------------------------
   const progress = el('div', 'checklist__progress');
   progress.setAttribute('role', 'status');
   rootEl.appendChild(progress);
@@ -247,11 +264,9 @@ export function renderChecklist(rootEl, draft, onChange) {
   wizard.appendChild(stepHost);
   rootEl.appendChild(wizard);
 
-  // First unanswered step (restores position on return); if all answered,
-  // land on the last step so "See your draft" is one tap away.
   function firstUnansweredIndex() {
-    for (let i = 0; i < steps.length; i++) {
-      if (!stepAnswered(draft, steps[i])) return i;
+    for (let i = 0; i < items.length; i++) {
+      if (!itemAnswered(draft, items[i])) return i;
     }
     return Math.max(0, total - 1);
   }
@@ -259,46 +274,39 @@ export function renderChecklist(rootEl, draft, onChange) {
   let activeIndex = firstUnansweredIndex();
 
   function updateProgress() {
-    const n = answeredCount(draft);
+    const n = answeredReadinessCount(draft);
     progress.textContent = '';
-    const strong = el('span', 'checklist__progress-count', n + ' of ' + total);
-    progress.appendChild(strong);
+    progress.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
     progress.appendChild(
       document.createTextNode(
-        ' answered' + (n === total ? ' — you have covered every question.' : '')
+        ' checked' + (n === total ? ' — you have been through every item.' : '')
       )
     );
   }
 
   function renderSummaries() {
     summariesEl.textContent = '';
-    const answeredSteps = steps
-      .map((step, i) => ({ step, i }))
-      .filter(({ step, i }) => i !== activeIndex && stepAnswered(draft, step));
-    if (!answeredSteps.length) return;
+    const answered = items
+      .map((item, i) => ({ item, i }))
+      .filter(({ item, i }) => i !== activeIndex && itemAnswered(draft, item));
+    if (!answered.length) return;
 
-    const heading2 = el('p', 'checklist__summaries-title', 'Answered so far');
-    summariesEl.appendChild(heading2);
+    summariesEl.appendChild(el('p', 'checklist__summaries-title', 'Checked so far'));
 
-    answeredSteps.forEach(({ step, i }) => {
+    answered.forEach(({ item, i }) => {
       const row = el('div', 'checklist__summary');
       const check = el('span', 'checklist__check', '✓');
       check.setAttribute('aria-hidden', 'true');
       row.appendChild(check);
 
       const textWrap = el('div', 'checklist__summary-text');
-      textWrap.appendChild(el('span', 'checklist__summary-prompt', step.prompt));
-      textWrap.appendChild(
-        el('span', 'checklist__summary-value', summaryValue(draft, step))
-      );
+      textWrap.appendChild(el('span', 'checklist__summary-prompt', item.prompt));
+      textWrap.appendChild(el('span', 'checklist__summary-value', summaryValue(draft, item)));
       row.appendChild(textWrap);
 
       const edit = el('button', 'checklist__edit', 'Edit');
       edit.type = 'button';
-      edit.setAttribute(
-        'aria-label',
-        'Edit your answer to: ' + step.prompt
-      );
+      edit.setAttribute('aria-label', 'Edit your answer to: ' + item.prompt);
       edit.addEventListener('click', () => goTo(i, true));
       row.appendChild(edit);
 
@@ -306,29 +314,50 @@ export function renderChecklist(rootEl, draft, onChange) {
     });
   }
 
-  const commit = (field, value) => {
-    draft.answers[field] = value;
+  const commit = (id, value) => {
+    draft.readiness.answers[id] = value;
     draft.updatedAt = new Date().toISOString();
     try {
       store.save(draft);
     } catch (err) {
       /* persistence is best-effort; the in-memory draft is source of truth */
     }
-    if (typeof onChange === 'function') onChange(field, value);
+    if (typeof onChange === 'function') onChange('readiness.' + id, value);
     document.dispatchEvent(
-      new CustomEvent('draft:changed', { detail: { field, value } })
+      new CustomEvent('draft:changed', { detail: { field: 'readiness.' + id, value } })
     );
     updateProgress();
     renderSummaries();
+    if (applyReadinessControls) applyReadinessControls();
   };
+
+  // Evaluate the advisory gate, persist it, and route: pass -> Part 1;
+  // otherwise -> the "gather this first" redirect. Preserves any prior
+  // acknowledgedRedirect so re-running readiness never silently re-locks.
+  function finishReadiness() {
+    const result = evaluateGate(draft);
+    const prev = (draft.readiness && draft.readiness.gate) || {};
+    draft.readiness.gate = {
+      evaluated: true,
+      passed: result.passed,
+      acknowledgedRedirect: !!prev.acknowledgedRedirect,
+    };
+    draft.updatedAt = new Date().toISOString();
+    try {
+      store.save(draft);
+    } catch (err) {
+      /* best-effort */
+    }
+    document.dispatchEvent(new CustomEvent('draft:changed'));
+    showScreen(result.passed ? 'part1' : 'redirect');
+  }
 
   function paintActive(focusIt) {
     stepHost.textContent = '';
     if (!total) return;
-    const step = steps[activeIndex];
-    const body = buildStepBody(step, draft, commit, activeIndex, total);
+    const item = items[activeIndex];
+    const body = buildStepBody(item, draft, commit, activeIndex, total);
 
-    // Per-step Back / Next (TRD-10).
     const nav = el('div', 'checklist__nav');
 
     const back = el('button', 'checklist__back', '← Back');
@@ -338,33 +367,29 @@ export function renderChecklist(rootEl, draft, onChange) {
     nav.appendChild(back);
 
     const isLast = activeIndex === total - 1;
-    const nextLabel = isLast
-      ? 'See your draft →'
-      : 'Next — ' + (activeIndex + 2) + ' of ' + total + ' →';
-    const next = el('button', 'checklist__next', nextLabel);
-    next.type = 'button';
-    next.addEventListener('click', () => {
-      if (isLast) {
-        // Single-source the forward path through the linear FLOW: readiness ->
-        // part1 (the first drafting screen), not straight to assembly. The
-        // persistent Next bar routes the same way, so the two never diverge.
-        showScreen('part1');
-      } else {
-        goTo(activeIndex + 1, true);
-      }
-    });
-    nav.appendChild(next);
+    if (isLast) {
+      const finish = el('button', 'checklist__next', 'Check my readiness →');
+      finish.type = 'button';
+      finish.disabled = !readinessCrucialAnswered(draft);
+      finish.addEventListener('click', finishReadiness);
+      nav.appendChild(finish);
+    } else {
+      const next = el(
+        'button',
+        'checklist__next',
+        'Next — ' + (activeIndex + 2) + ' of ' + total + ' →'
+      );
+      next.type = 'button';
+      next.addEventListener('click', () => goTo(activeIndex + 1, true));
+      nav.appendChild(next);
+    }
 
     body.appendChild(nav);
     stepHost.appendChild(body);
 
-    announce(
-      'Step ' + (activeIndex + 1) + ' of ' + total + ': ' + (step.prompt || '')
-    );
+    announce('Step ' + (activeIndex + 1) + ' of ' + total + ': ' + (item.prompt || ''));
 
     if (focusIt) {
-      // Move focus to the step's counter/heading region without yanking to a
-      // control the user did not choose. The prompt is the natural landmark.
       const prompt = body.querySelector('.checklist__prompt');
       if (prompt) {
         prompt.tabIndex = -1;
@@ -379,7 +404,32 @@ export function renderChecklist(rootEl, draft, onChange) {
     paintActive(focusIt);
   }
 
+  // Persistent control bar: on the readiness screen the Next control finishes
+  // the check (evaluate gate -> route) and stays disabled until every crucial
+  // item has an answer. Guarded so an off-screen (boot) render never clobbers
+  // another screen's controls.
+  applyReadinessControls = function () {
+    if (getScreen() !== 'readiness') return;
+    setControls({
+      next: {
+        label: 'Check my readiness →',
+        disabled: !readinessCrucialAnswered(draft),
+      },
+      onNext: finishReadiness,
+    });
+  };
+
+  if (!listenerBound) {
+    listenerBound = true;
+    document.addEventListener('screen:changed', function (e) {
+      if (e && e.detail && e.detail.name === 'readiness' && applyReadinessControls) {
+        applyReadinessControls();
+      }
+    });
+  }
+
   updateProgress();
   renderSummaries();
   paintActive(false);
+  applyReadinessControls();
 }

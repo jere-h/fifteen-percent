@@ -195,9 +195,46 @@ function normalizeDraft(stored) {
       // Never trusted from storage — recomputed by the reckoner.
       rewardEstimate: null,
     },
+    readiness: mergeReadiness(base.readiness, stored.readiness),
+    freeText: mergeFreeText(base.freeText, stored.freeText),
     narrativeOverride: typeof stored.narrativeOverride === 'string'
       ? stored.narrativeOverride
       : base.narrativeOverride,
     fieldOverrides: { ...storedOverrides },
   };
+}
+
+// Merge a stored readiness blob onto the fresh base. Additive & defensive: a
+// pre-readiness (older v1) draft simply keeps the empty base. Answers and gate
+// are shallow-copied so no stored reference leaks into the live draft.
+function mergeReadiness(base, stored) {
+  if (!stored || typeof stored !== 'object') return base;
+  const storedAnswers =
+    stored.answers && typeof stored.answers === 'object' ? stored.answers : {};
+  const storedGate =
+    stored.gate && typeof stored.gate === 'object' ? stored.gate : {};
+  return {
+    answers: { ...storedAnswers },
+    gate: {
+      evaluated: !!storedGate.evaluated,
+      passed:
+        typeof storedGate.passed === 'boolean' ? storedGate.passed : base.gate.passed,
+      acknowledgedRedirect: !!storedGate.acknowledgedRedirect,
+    },
+  };
+}
+
+// Merge the two free-text sides onto the fresh base, each with its own answers
+// map and optional whole-block override string.
+function mergeFreeText(base, stored) {
+  if (!stored || typeof stored !== 'object') return base;
+  const side = (key) => {
+    const s = stored[key] && typeof stored[key] === 'object' ? stored[key] : {};
+    const answers = s.answers && typeof s.answers === 'object' ? s.answers : {};
+    return {
+      answers: { ...answers },
+      override: typeof s.override === 'string' ? s.override : base[key].override,
+    };
+  };
+  return { ft1: side('ft1'), ft2: side('ft2') };
 }

@@ -162,6 +162,11 @@ export function showScreen(name, opts) {
     const heading = screen && screen.querySelector('h2[tabindex="-1"]');
     if (heading && typeof heading.focus === 'function') heading.focus();
   }
+
+  // Notify content modules AFTER the default control bar is applied, so a screen
+  // that needs gate-aware controls (readiness) or dynamic content (redirect) can
+  // override on entry. Fires on every navigation, focus or not.
+  document.dispatchEvent(new CustomEvent('screen:changed', { detail: { name: name } }));
 }
 
 /** The currently shown screen name. */

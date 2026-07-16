@@ -4,8 +4,8 @@
 // the app's bundled content, so the page runs fully offline from a file:// copy.
 //
 // Want your own values? You can edit THIS ONE FILE by hand:
-//   - `checklist.steps`  -> the guided-wizard questions and options
-//   - `transferMap.fields` -> the IRAS-label -> draft-chunk pairings
+//   - `readiness.items` -> the tap-first readiness-check questions and options
+//   - `parts`           -> the Part names + time estimates
 // Keep each object's shape (the keys) intact and the rest of the app keeps working.
 //
 // Every figure below is denominated in Singapore dollars (whole dollars, no cents).
@@ -13,116 +13,188 @@
 // public IRAS record; update them when you re-check.
 
 // ---------------------------------------------------------------------------
-// checklist — the tap-first guided wizard, mirroring IRAS informant fields
+// evidenceAttachments — evidence answer -> concrete "bring this file" wording
 // ---------------------------------------------------------------------------
-// Shape (per step):
-//   { id, field, prompt, inputType: 'chips'|'radio'|'multiselect'|'shorttext',
-//     options?: string[] }
-// `field` maps 1:1 to ReportDraft.answers keys. Wording stays neutral and aims
-// to substantiate the claim, not to foreground identifying the taxpayer.
-export const checklist = {
-  steps: [
+// Its keys are the canonical evidence option strings, reused verbatim by the
+// readiness `evidence` item below, so the two never drift. Items with
+// attach:false are things a user cannot attach as a file (an in-person account)
+// and render as a gentle note instead.
+export const evidenceAttachments = {
+  "Invoices or receipts": { attach: true, text: "invoices or receipts" },
+  "Bank or payment records": { attach: true, text: "bank or payment records" },
+  "Messages or emails": { attach: true, text: "message or email exports" },
+  "Photos or screenshots": { attach: true, text: "photos or screenshots" },
+  "Contracts or agreements": { attach: true, text: "contracts or agreements" },
+  "What I saw or overheard in person": {
+    attach: false,
+    text: "what you saw or overheard in person (nothing to attach — describe it in the summary)",
+  },
+  "Nothing kept yet, only my account": {
+    attach: false,
+    text: "nothing kept yet (there is no file to attach — your account is the record)",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// readiness — the tap-first readiness check (Part 0)
+// ---------------------------------------------------------------------------
+// This does NOT re-collect the IRAS form's simple structured fields as prose —
+// the form already collects them directly. It VERIFIES the reader actually has
+// each piece and becomes the advisory gate (see js/gate.js). One item per
+// screen, tap-only.
+//
+// Shape (per item):
+//   { id, kind:'select'|'verify', prompt, hint,
+//     options?: string[],   // select items: the tap choices (verbatim to the form)
+//     multi?: boolean,      // select items: pick-many when true
+//     crucial?: 'who'|'what'|'how' }  // gate group this item feeds
+//
+// 'select' single -> stores the chosen string; 'select' multi -> stores string[].
+// 'verify' -> renders three choices (default "I have this / Not sure / No", or a
+// custom `options` triple) mapped by index to 'have' | 'unsure' | 'no'.
+export const readiness = {
+  part: { name: "Part 0: Readiness", estimate: "~3 mins" },
+  items: [
     {
-      id: "step-tax-type",
-      field: "taxType",
-      prompt: "Which kind of tax does this involve?",
-      inputType: "chips",
+      id: "reportingOn",
+      kind: "select",
+      multi: false,
+      crucial: "who",
+      prompt: "Who are you reporting on?",
+      hint: "Pick one. The form asks this first.",
       options: [
-        "Income Tax",
-        "Goods & Services Tax (GST)",
+        "An individual",
+        "A business",
+        "Both an individual and a business",
+      ],
+    },
+    {
+      id: "identityDetails",
+      kind: "verify",
+      crucial: "who",
+      prompt:
+        "Do you have their identity details — a name, plus any address, NRIC/FIN or UEN you happen to know?",
+      hint: "You will type these into the form itself, not here.",
+    },
+    {
+      id: "taxTypes",
+      kind: "select",
+      multi: true,
+      crucial: "what",
+      prompt: "Which type(s) of tax are involved?",
+      hint: "Pick any that apply.",
+      options: [
+        "Individual Income Tax",
+        "Corporate Income Tax",
+        "GST",
         "Property Tax",
-        "Stamp Duty",
-        "Not sure",
+        "Stamp Duties",
+        "Others",
       ],
     },
     {
-      id: "step-offence-nature",
-      field: "offenceNature",
-      prompt: "In plain words, what seems to be going wrong?",
-      inputType: "radio",
+      id: "behaviours",
+      kind: "select",
+      multi: true,
+      crucial: "what",
+      prompt: "What best describes what happened?",
+      hint: "Pick any that apply.",
       options: [
-        "Income or sales not being declared",
-        "False or inflated expense or refund claims",
-        "Records or documents that look falsified",
-        "Something else that seems off",
+        "Did not file a tax return or notify chargeability to tax",
+        "Under-declared or omitted income, sales or turnover",
+        "Over-claimed or fictitious expenses, deductions or reliefs",
+        "Fraudulent GST refund or input tax claims",
+        "Failure to register for GST when required",
+        "Charging or collecting GST without GST registration",
+        "Falsifying records, invoices or documents",
+        "Dealing in cash to hide income or under-report earnings",
+        "Not issuing receipts or keeping proper records",
+        "Others",
       ],
     },
     {
-      id: "step-taxpayer-known",
-      field: "taxpayerDetailsKnown",
+      id: "timing",
+      kind: "verify",
       prompt:
-        "How much do you know about who is involved (a name, a business, an address)?",
-      inputType: "radio",
-      options: [
-        "I have a full name or registered business",
-        "I have partial details only",
-        "I only know it happened, not who",
-      ],
+        "Do you know roughly when this happened — a period, a year, or specific dates?",
+      hint: "Even an approximate period helps.",
     },
     {
-      id: "step-time-period",
-      field: "timePeriod",
-      prompt: "Roughly when did this happen or is it happening?",
-      inputType: "chips",
-      options: [
-        "Currently ongoing",
-        "Within the last year",
-        "One to three years ago",
-        "More than three years ago",
-        "Unsure of the dates",
-      ],
+      id: "amount",
+      kind: "verify",
+      prompt: "Do you have a sense of the amount or value involved?",
+      hint: "A rough figure is fine; an exact one is not required.",
     },
     {
-      id: "step-evidence",
-      field: "evidenceInHand",
-      prompt: "What can you actually point to? Pick everything that applies.",
-      inputType: "multiselect",
-      options: [
-        "Invoices or receipts",
-        "Bank or payment records",
-        "Messages or emails",
-        "Photos or screenshots",
-        "Contracts or agreements",
-        "What I saw or overheard in person",
-        "Nothing kept yet, only my account",
-      ],
+      id: "whoElse",
+      kind: "verify",
+      prompt: "Do you know who else, if anyone, was involved?",
+      hint: "This is optional on the form.",
     },
     {
-      id: "step-relationship",
-      field: "relationship",
+      id: "evidence",
+      kind: "select",
+      multi: true,
+      crucial: "how",
+      prompt: "What can you point to as supporting information?",
+      hint: "Pick any that apply. You can attach files on the form later.",
+      options: Object.keys(evidenceAttachments),
+    },
+    {
+      id: "relationship",
+      kind: "select",
+      multi: true,
+      crucial: "how",
       prompt: "How did you come to know about this?",
-      inputType: "radio",
+      hint: "Pick any that apply.",
       options: [
-        "Through my work or former work",
-        "As a customer or supplier",
-        "Personal or family connection",
-        "I would rather not say",
+        "I am, or was, an employee",
+        "I am, or was, a business partner or associate",
+        "I am, or was, a customer or client",
+        "I am, or was, a supplier or contractor",
+        "Through a personal or family connection",
+        "A competitor in the same trade",
+        "A member of the public",
+        "Others",
       ],
     },
     {
-      id: "step-identify-reward",
-      field: "identifyForReward",
+      id: "priorIras",
+      kind: "verify",
+      prompt: "Have you already reported this to IRAS before?",
+      hint: "The form asks whether this is a repeat report.",
+      options: ["Yes, already reported", "Not sure", "No, not yet"],
+    },
+    {
+      id: "reward",
+      kind: "select",
+      multi: false,
       prompt:
-        "IRAS can pay a discretionary reward, but only if you let them contact you. Do you want to be identifiable for a possible reward?",
-      inputType: "radio",
-      options: [
-        "Yes, I will provide contact details",
-        "No, I want to stay anonymous",
-        "Undecided for now",
-      ],
+        "Do you want to be considered for the informant reward (up to ~S$100,000, at IRAS's discretion)?",
+      hint: "A reward is only possible if you let IRAS contact you.",
+      options: ["Yes, and I confirm the requirements", "No"],
+    },
+    {
+      id: "contact",
+      kind: "select",
+      multi: false,
+      prompt: "How may IRAS contact you, if at all?",
+      hint: "Staying anonymous means no reward is possible.",
+      options: ["Email", "Phone", "I do not wish to be contacted"],
     },
   ],
 };
 
 // ---------------------------------------------------------------------------
-// transferMap — ordered IRAS-label -> draftKey mappings for manual Transfer Mode
+// parts — Part names + honest time estimates (timeboxes). Part 0 lives on
+// `readiness.part`; Parts 1 and 2 are the two free-text drafting screens.
+// The three estimates (~3 + ~5 + ~4) reconcile with the intro modal's ~12 mins.
 // ---------------------------------------------------------------------------
-// Shape (per field):
-//   { irasLabel, draftKey, formatter?: 'list'|'text' }
-// `draftKey` is the chunk the draft builder emits (matched, in order, against the
-// IRAS informant form's own field labels). `formatter` hints how a chunk should
-// read when copied: 'list' for multi-value answers, 'text' (default) for prose.
-// Copy is manual and one field at a time; the app never submits to IRAS for you.
+export const parts = {
+  part1: { name: "Part 1: What happened", estimate: "~5 mins" },
+  part2: { name: "Part 2: How you know", estimate: "~4 mins" },
+};
+
 // ---------------------------------------------------------------------------
 // money — the SINGLE honest source of every monetary phrase (TRD-3)
 // ---------------------------------------------------------------------------
@@ -239,70 +311,3 @@ export function fragmentFor(field, label) {
   return String(label == null ? "" : label).toLowerCase();
 }
 
-// ---------------------------------------------------------------------------
-// evidenceAttachments — evidence answer -> concrete "bring this file" wording
-// ---------------------------------------------------------------------------
-// Drives the closing "bring these files to attach" checklist (TRD-17). Items
-// with attach:false are things a user cannot attach as a file (an in-person
-// account) and render as a gentle note instead.
-export const evidenceAttachments = {
-  "Invoices or receipts": { attach: true, text: "invoices or receipts" },
-  "Bank or payment records": { attach: true, text: "bank or payment records" },
-  "Messages or emails": { attach: true, text: "message or email exports" },
-  "Photos or screenshots": { attach: true, text: "photos or screenshots" },
-  "Contracts or agreements": { attach: true, text: "contracts or agreements" },
-  "What I saw or overheard in person": {
-    attach: false,
-    text: "what you saw or overheard in person (nothing to attach — describe it in the summary)",
-  },
-  "Nothing kept yet, only my account": {
-    attach: false,
-    text: "nothing kept yet (there is no file to attach — your account is the record)",
-  },
-};
-
-export const transferMap = {
-  lastVerified: "2026-07-16",
-  fields: [
-    {
-      irasLabel: "Type of tax",
-      draftKey: "taxType",
-      formatter: "text",
-    },
-    {
-      irasLabel: "Nature of the alleged offence",
-      draftKey: "offenceNature",
-      formatter: "text",
-    },
-    {
-      irasLabel: "Details of the person or business",
-      draftKey: "taxpayerDetailsKnown",
-      formatter: "text",
-    },
-    {
-      irasLabel: "Period the offence relates to",
-      draftKey: "timePeriod",
-      formatter: "text",
-    },
-    {
-      irasLabel: "Supporting information and documents held",
-      draftKey: "evidenceInHand",
-      formatter: "list",
-    },
-    {
-      irasLabel: "How you came to know of this",
-      draftKey: "relationship",
-      formatter: "text",
-    },
-    {
-      irasLabel: "Your contact details (for reward eligibility)",
-      draftKey: "identifyForReward",
-      formatter: "text",
-    },
-    {
-      irasLabel: "Summary of what happened",
-      draftKey: "narrative",
-      formatter: "text",
-    },
-  ],
-};

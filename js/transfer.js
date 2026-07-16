@@ -15,10 +15,18 @@
 // This is manual copy-paste only. Nothing here ever contacts or auto-submits
 // to IRAS.
 
-import { transferMap, money, evidenceAttachments } from './data.js';
+import { money, evidenceAttachments } from './data.js';
 import { writeText } from './clipboard.js';
 import { buildNarrative } from './draft.js';
 import { showScreen } from './router.js';
+
+// BRIDGE (temporary): the hallucinated per-field transferMap was removed from
+// data.js in IP-2 (the Transfer surface is being rebuilt around the two
+// free-text blocks + a readiness cheat-sheet in a later phase, IP-3/TRD-3.5).
+// Until that rewrite lands, this module keeps its signature but resolves to an
+// empty field set so the app still loads and the screen renders a neutral,
+// non-crashing placeholder rather than the old invented IRAS-label mapping.
+const transferMap = { lastVerified: null, fields: [] };
 
 let toastTimer = null;
 
@@ -296,6 +304,22 @@ export function renderTransfer(rootEl, draft) {
   heading.id = 'transfer-heading';
   heading.tabIndex = -1; // TRD-8 focus target on view switch
   header.appendChild(heading);
+
+  // BRIDGE (see the transferMap note at the top of this file): while the
+  // two-free-text-block + cheat-sheet Transfer surface is being rebuilt, show a
+  // calm placeholder instead of the old invented field grid.
+  if (!transferMap.fields.length) {
+    header.appendChild(
+      el(
+        'p',
+        null,
+        'The copy-ready output is being rebuilt around the two free-text blocks and a short readiness cheat-sheet. It will appear here once Parts 1 and 2 are drafted.'
+      )
+    );
+    wrap.appendChild(header);
+    rootEl.appendChild(wrap);
+    return;
+  }
   header.appendChild(
     el(
       'p',

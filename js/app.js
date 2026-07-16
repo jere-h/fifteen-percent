@@ -13,7 +13,7 @@
 //   - Expose renderAll(draft), used by the Safety panel's Clear to return the
 //     whole page to its empty state.
 
-import { createEmptyDraft, answeredCount, ANSWER_FIELDS } from './state.js';
+import { createEmptyDraft } from './state.js';
 import {
   load as loadDraft,
   save as saveDraft,
@@ -21,11 +21,13 @@ import {
 } from './store.js';
 import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
+import { renderRedirect } from './gate.js';
+import { renderPartHeaders } from './builders.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
 import { renderSafety, renderSaveControl } from './safety.js';
 import { renderReckoner } from './reckoner.js';
-import { showScreen } from './router.js';
+import { showScreen, setControls } from './router.js';
 import { openModal, closeModal } from './modal.js';
 
 // The one in-memory reportDraft this page treats as source of truth.
@@ -81,11 +83,14 @@ function renderBuilderStub(rootEl, label) {
 
 // Which Home phase-menu targets are currently reachable. A fresh draft can only
 // enter the Readiness check; the drafting phases (Part 1 / Part 2 / Review) stay
-// locked until the readiness check is complete, so a first-time user sees only
-// Readiness enabled (TRD-1.3). The threshold will tighten to per-phase progress
-// once the Part 1 / Part 2 builders carry their own completion state.
+// locked until the reader has been through the readiness check AND either passed
+// the advisory gate or explicitly chosen to continue past the redirect. This
+// keeps the Home menu consistent with the in-flow gate (TRD-2.4).
 function menuReachable(draft) {
-  const readinessComplete = answeredCount(draft) >= ANSWER_FIELDS.length;
+  const gate = (draft && draft.readiness && draft.readiness.gate) || {};
+  const readinessComplete = !!(
+    gate.evaluated && (gate.passed || gate.acknowledgedRedirect)
+  );
   return {
     readiness: true,
     part1: readinessComplete,
@@ -171,16 +176,67 @@ function renderDependent() {
   updateMenuGating(currentDraft);
 }
 
-// Called by the checklist for each answered field. Update the in-memory draft
-// and persist (store.save is a no-op while persistence is off). The checklist
-// itself dispatches 'draft:changed', which drives the dependent re-render.
+// Called by the readiness check for each answered item. Fields prefixed
+// 'readiness.' route into draft.readiness.answers; any other field falls back to
+// the legacy draft.answers map (kept for back-compat). The checklist itself
+// dispatches 'draft:changed', which drives the dependent re-render.
 function handleChange(field, value) {
-  if (!currentDraft.answers || typeof currentDraft.answers !== 'object') {
-    currentDraft.answers = {};
+  if (typeof field === 'string' && field.indexOf('readiness.') === 0) {
+    if (!currentDraft.readiness || typeof currentDraft.readiness !== 'object') {
+      currentDraft.readiness = {
+        answers: {},
+        gate: { evaluated: false, passed: null, acknowledgedRedirect: false },
+      };
+    }
+    if (!currentDraft.readiness.answers || typeof currentDraft.readiness.answers !== 'object') {
+      currentDraft.readiness.answers = {};
+    }
+    currentDraft.readiness.answers[field.slice('readiness.'.length)] = value;
+  } else {
+    if (!currentDraft.answers || typeof currentDraft.answers !== 'object') {
+      currentDraft.answers = {};
+    }
+    currentDraft.answers[field] = value;
   }
-  currentDraft.answers[field] = value;
   touch(currentDraft);
   saveDraft(currentDraft);
+}
+
+// Record that the reader chose to continue past the "gather this first" redirect
+// (or used the persistent Next on that screen). Sets the acknowledgement so the
+// Home menu unlocks the drafting Parts, then proceeds to Part 1.
+function acknowledgeRedirect() {
+  if (!currentDraft.readiness || typeof currentDraft.readiness !== 'object') {
+    currentDraft.readiness = { answers: {}, gate: {} };
+  }
+  if (!currentDraft.readiness.gate || typeof currentDraft.readiness.gate !== 'object') {
+    currentDraft.readiness.gate = {};
+  }
+  currentDraft.readiness.gate.evaluated = true;
+  currentDraft.readiness.gate.acknowledgedRedirect = true;
+  touch(currentDraft);
+  saveDraft(currentDraft);
+  updateMenuGating(currentDraft);
+  showScreen('part1');
+}
+
+// Paint the dynamic "gather this first" redirect body (naming the thin crucial
+// group) and mirror its "Continue anyway" onto the persistent Next control.
+function renderRedirectScreen() {
+  const screen = el('screen-redirect');
+  if (!screen) return;
+  safeRender('redirect', function () {
+    renderRedirect(screen, currentDraft, {
+      onContinue: acknowledgeRedirect,
+      onBackToMenu: function () {
+        showScreen('home');
+      },
+    });
+  });
+  setControls({
+    next: { label: 'Continue anyway →' },
+    onNext: acknowledgeRedirect,
+  });
 }
 
 // Called by the draft section for per-field inline edits, captured as
@@ -259,6 +315,11 @@ export function renderAll(draft) {
     });
   }
 
+  // Timeboxed Part headers (Part 1 / Part 2) are single-sourced from data.js.
+  safeRender('part-headers', function () {
+    renderPartHeaders();
+  });
+
   const saveControlEl = el('save-control');
   if (saveControlEl) {
     safeRender('save-control', function () {
@@ -301,6 +362,15 @@ function boot() {
   // dependent sections only, so we never clobber active tap/focus state.
   document.addEventListener('draft:changed', function () {
     renderDependent();
+  });
+
+  // The redirect screen's body depends on the live gate result, so (re)paint it
+  // on entry. Fired by the router after it applies the default control bar, so
+  // renderRedirectScreen's setControls override wins.
+  document.addEventListener('screen:changed', function (e) {
+    if (e && e.detail && e.detail.name === 'redirect') {
+      renderRedirectScreen();
+    }
   });
 }
 

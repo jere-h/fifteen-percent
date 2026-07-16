@@ -31,6 +31,14 @@ export const SCHEMA_VERSION = 1;
 //     recoverableInput: string,     // raw text the user typed
 //     rewardEstimate: number|null   // DERIVED — recomputed, never trusted from storage
 //   },
+//   readiness: {                    // form-aligned readiness check + advisory gate
+//     answers: { [itemId]: string | string[] | 'have'|'unsure'|'no' },
+//     gate: { evaluated: boolean, passed: boolean|null, acknowledgedRedirect: boolean }
+//   },
+//   freeText: {                     // working data for the two hard free-text fields
+//     ft1: { answers: { [promptId]: string }, override: string|null },
+//     ft2: { answers: { [promptId]: string }, override: string|null }
+//   },
 //   narrativeOverride: string|null, // full-narrative hand edit (draft.js)
 //   fieldOverrides: {               // per-field Transfer Mode hand edits
 //     [draftKey: string]: string    // draftKey -> edited text
@@ -46,8 +54,9 @@ export const SCHEMA_VERSION = 1;
 //
 // Returns a fresh object graph on every call — no shared references — so
 // callers can mutate the result freely without touching a previous draft.
-// The seven checklist answer fields, in order. Kept beside createEmptyDraft so
-// progress accounting (answeredCount) has one canonical field list.
+// The seven LEGACY checklist answer fields, in order. Retained for back-compat
+// load of pre-readiness drafts; the live flow now writes draft.readiness.answers
+// (see READINESS_CRUCIAL below and js/data.js `readiness.items`).
 export const ANSWER_FIELDS = [
   'taxType',
   'offenceNature',
@@ -56,6 +65,20 @@ export const ANSWER_FIELDS = [
   'evidenceInHand',
   'relationship',
   'identifyForReward',
+];
+
+// The readiness item ids the advisory gate treats as crucial (js/gate.js reads
+// these). The three vision groups map: who → reportingOn + identityDetails,
+// what → taxTypes + behaviours, how → relationship + evidence. Kept here so the
+// gate, the "Next disabled until crucial answered" rule, and the model stay in
+// sync from one source.
+export const READINESS_CRUCIAL = [
+  'reportingOn',
+  'identityDetails',
+  'taxTypes',
+  'behaviours',
+  'evidence',
+  'relationship',
 ];
 
 // Pure: how many of the seven checklist fields are answered. A string answer
@@ -91,6 +114,25 @@ export function createEmptyDraft() {
     reckoner: {
       recoverableInput: '',
       rewardEstimate: null,
+    },
+    // Form-aligned readiness check (verifies, never re-enters, the IRAS form's
+    // simple structured fields) plus the advisory gate state derived from it.
+    // answers is keyed by readiness item id -> string (single select),
+    // string[] (multi select) or 'have'|'unsure'|'no' (verify item).
+    readiness: {
+      answers: {},
+      gate: {
+        evaluated: false,
+        passed: null,
+        acknowledgedRedirect: false,
+      },
+    },
+    // Working data for the two hard free-text fields the app drafts. Each side
+    // keeps refined per-prompt answers (never an "unsure" placeholder) and an
+    // optional whole-block hand-edit override.
+    freeText: {
+      ft1: { answers: {}, override: null },
+      ft2: { answers: {}, override: null },
     },
     narrativeOverride: null,
     fieldOverrides: {},

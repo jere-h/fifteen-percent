@@ -1507,3 +1507,101 @@ body.modal-open {
     align-items: start;
   }
 }
+
+/* ------------------------------------------------- Part timebox (TRD-2.5) */
+/* Real, visible AA-contrast text restating a Part's honest time estimate under
+   its heading — never a title-only attribute. */
+.part__timebox {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  letter-spacing: .02em;
+  color: var(--color-muted);
+}
+
+/* --------------------------------------------- Redirect screen (TRD-2.4) */
+/* The advisory "gather this first" screen. Procedural only — names what to
+   collect, never characterises conduct or predicts an outcome. */
+.redirect__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.redirect__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.redirect__item-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-fg);
+}
+
+.redirect__item-detail {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--color-fg);
+}
+
+.redirect__note {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+  max-width: 62ch;
+}
+
+.redirect__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* ------------------------------------------------- Shared action buttons */
+/* Reusable primary/secondary buttons (redirect actions, and future screens).
+   Clears the 44px tap floor with a visible focus ring in both themes. */
+.btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn--primary {
+  border: none;
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.btn--primary:hover,
+.btn--primary:focus-visible {
+  filter: brightness(1.06);
+}
+
+.btn--secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.btn--secondary:hover,
+.btn--secondary:focus-visible {
+  border-color: var(--color-accent);
+}
