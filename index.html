@@ -2,75 +2,139 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fifteen Percent: prepare an IRAS report, privately</title>
-<meta name="description" content="A calm, offline-capable tool to help you turn what you've seen into a clear, copy-ready tax-evasion report to IRAS. Nothing is sent anywhere; everything stays on your device.">
+<meta name="description" content="A calm, offline-capable tool that drafts the two hardest free-text fields of an IRAS tax-evasion report for you. Nothing is sent anywhere; everything stays on your device.">
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="styles.css">
 
 <div id="app">
 
-  <header class="banner" role="banner">
-    <p class="banner__mark">Independent tool. Not affiliated with, endorsed by, or operated by IRAS or any government body. Nothing you type is submitted or transmitted anywhere.</p>
-    <p class="banner__verified">Reference figures last verified on 16 July 2026.</p>
-  </header>
-
-  <header class="hero">
-    <h1 class="hero__headline">
-      You could be paid
-      <span class="hero__figure" id="hero-figure">up to ~S$100,000</span>
-      for reporting tax evasion to IRAS — a reward of
-      <span class="hero__rate">15%</span>
-      of the tax they recover.
-    </h1>
-    <p class="hero__subhead">
-      Few people know this, and the official form can't be saved once you start. This private tool lets you prepare your report at your own pace, then copy it across yourself. It is a discretionary reward, never a promise.
-    </p>
-
-    <section id="reckoner" class="reckoner" aria-label="Estimate your possible reward"></section>
-  </header>
-
-  <div id="save-control" class="save-control-wrap"></div>
-
-  <div id="welcome-back" aria-live="polite"></div>
-
-  <details id="safety-wrap" class="safety-wrap">
-    <summary class="safety-wrap__summary">Private: everything stays in this browser — nothing is sent. Read how &amp; manage your data</summary>
-    <section id="safety" class="section" aria-label="Safety and privacy"></section>
-  </details>
-
-  <nav class="stepnav" role="tablist" aria-label="Report sections">
-    <button type="button" class="stepnav__tab" role="tab" id="tab-checklist" aria-controls="view-checklist" aria-selected="true" data-view="checklist">
-      <span class="stepnav__index">1</span> Checklist
-    </button>
-    <button type="button" class="stepnav__tab" role="tab" id="tab-draft" aria-controls="view-draft" aria-selected="false" data-view="draft">
-      <span class="stepnav__index">2</span> Assembly
-    </button>
-    <button type="button" class="stepnav__tab" role="tab" id="tab-transfer" aria-controls="view-transfer" aria-selected="false" data-view="transfer">
-      <span class="stepnav__index">3</span> Transfer
-    </button>
-  </nav>
-
   <main>
 
-    <div id="view-checklist" class="view" role="tabpanel" aria-labelledby="tab-checklist">
+    <!-- ============================================================ HOME -->
+    <section class="screen" id="screen-home" aria-labelledby="home-heading">
+
+      <header class="banner">
+        <p class="banner__mark">Independent tool — not affiliated with IRAS. Nothing you type is sent anywhere.</p>
+        <p class="banner__verified">Figures verified 16 Jul 2026.</p>
+      </header>
+
+      <header class="hero">
+        <h1 class="hero__headline">
+          You could be paid
+          <span class="hero__figure" id="hero-figure">up to ~S$100,000</span>
+          for reporting tax evasion to IRAS — a reward of
+          <span class="hero__rate">15%</span>
+          of the tax they recover.
+        </h1>
+        <p class="hero__subhead">
+          Tap, don&rsquo;t type — this private tool drafts the two hardest parts for you.
+        </p>
+      </header>
+
+      <section id="reckoner" class="reckoner" aria-label="Estimate your possible reward"></section>
+
+      <div class="home__action">
+        <h2 class="home__heading" id="home-heading" tabindex="-1">Ready when you are</h2>
+        <button type="button" class="home__start" id="home-start">Start — about 12 minutes</button>
+        <p class="home__reassure">Nothing is sent anywhere — everything stays in this browser.</p>
+
+        <nav class="home__menu-wrap" aria-label="Jump to a section">
+          <ul class="home__menu">
+            <li><button type="button" class="home__menu-item" data-target="readiness" aria-describedby="home-menu-hint">Readiness check</button></li>
+            <li><button type="button" class="home__menu-item" data-target="part1" aria-describedby="home-menu-hint">Part 1: What happened</button></li>
+            <li><button type="button" class="home__menu-item" data-target="part2" aria-describedby="home-menu-hint">Part 2: How you know</button></li>
+            <li><button type="button" class="home__menu-item" data-target="transfer" aria-describedby="home-menu-hint">Review &amp; copy</button></li>
+          </ul>
+          <p class="home__menu-hint" id="home-menu-hint" hidden>Finish the readiness check to unlock the drafting steps.</p>
+        </nav>
+
+        <div id="save-control" class="save-control-wrap"></div>
+
+        <p class="home__links">
+          <button type="button" class="home__privacy-link" id="home-privacy">Privacy &amp; your data</button>
+        </p>
+      </div>
+
+    </section>
+
+    <!-- ======================================================= READINESS -->
+    <section class="screen" id="screen-readiness" hidden>
       <section id="checklist" class="section" aria-labelledby="checklist-heading"></section>
+    </section>
 
-      <button type="button" class="view__next" data-next="draft">See your draft →</button>
-    </div>
+    <!-- ======================================================== REDIRECT -->
+    <section class="screen" id="screen-redirect" hidden>
+      <h2 id="redirect-heading" tabindex="-1">A few things to gather first</h2>
+      <p class="screen__lead">
+        Before you draft your report it helps to have a few details on hand. Gather what you can, then come back to the readiness check.
+      </p>
+    </section>
 
-    <div id="view-draft" class="view" role="tabpanel" aria-labelledby="tab-draft" hidden>
+    <!-- =========================================================== PART 1 -->
+    <section class="screen" id="screen-part1" hidden>
+      <h2 id="part1-heading" tabindex="-1">Part 1: What happened</h2>
+      <p class="screen__lead">
+        Here we help you draft the form's field:
+        <strong>&ldquo;Provide as much detail as possible about the tax evasion or tax fraud.&rdquo;</strong>
+        You choose; the app writes the words.
+      </p>
+      <div id="builder-ft1" class="builder"></div>
+    </section>
+
+    <!-- =========================================================== PART 2 -->
+    <section class="screen" id="screen-part2" hidden>
+      <h2 id="part2-heading" tabindex="-1">Part 2: How you became aware</h2>
+      <p class="screen__lead">
+        Here we help you draft the form's field:
+        <strong>&ldquo;Explain how and when you became aware of the tax evasion or tax fraud.&rdquo;</strong>
+      </p>
+      <div id="builder-ft2" class="builder"></div>
+    </section>
+
+    <!-- ========================================================= ASSEMBLY -->
+    <section class="screen" id="screen-assembly" hidden>
       <section id="draft" class="section" aria-labelledby="draft-heading"></section>
+    </section>
 
-      <button type="button" class="view__next" data-next="transfer">Go to Transfer Mode →</button>
-    </div>
-
-    <div id="view-transfer" class="view" role="tabpanel" aria-labelledby="tab-transfer" hidden>
+    <!-- ========================================================= TRANSFER -->
+    <section class="screen" id="screen-transfer" hidden>
       <section id="transfer" class="section" aria-labelledby="transfer-heading"></section>
-    </div>
+    </section>
 
   </main>
+
+  <!-- ================================================ Persistent controls -->
+  <nav id="screen-controls" aria-label="Screen navigation">
+    <button type="button" class="screen-controls__back" id="ctl-back">&larr; Back</button>
+    <button type="button" class="screen-controls__menu" id="ctl-menu">Menu</button>
+    <button type="button" class="screen-controls__next" id="ctl-next">Next &rarr;</button>
+  </nav>
+
+  <!-- Off-screen host for the safety panel; opened inside the accessible modal -->
+  <div id="safety-host" hidden>
+    <section id="safety" class="section" aria-label="Safety and privacy"></section>
+  </div>
+
+  <!-- Intro dialog content, cloned into the modal by router.js -->
+  <template id="intro-modal-template">
+    <div class="modal__content intro">
+      <h2 class="modal__title" id="intro-modal-title" tabindex="-1">Here&rsquo;s how this works</h2>
+      <ul class="intro__list">
+        <li>The IRAS form already collects the simple choices itself. This tool drafts the two hard parts for you: <em>what happened</em>, and <em>how you became aware</em>.</li>
+        <li>You tap to choose; the app writes the words. Almost no typing.</li>
+        <li>Everything stays on this device. Nothing is ever sent anywhere.</li>
+        <li>About 12 minutes in all. You can leave and come back to where you left off.</li>
+      </ul>
+      <div class="modal__actions">
+        <button type="button" class="modal__btn modal__btn--primary" data-action="start-readiness">Start the readiness check</button>
+        <button type="button" class="modal__btn modal__btn--secondary" data-action="dismiss">Not now</button>
+      </div>
+    </div>
+  </template>
 
   <div id="sr-live" class="sr-only" aria-live="polite" role="status"></div>
 
 </div>
 
 <script type="module" src="js/app.js"></script>
-<script type="module" src="js/nav.js"></script>
+<script type="module" src="js/router.js"></script>

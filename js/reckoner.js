@@ -36,7 +36,7 @@ export function renderReckoner(rootEl, draft, onBand) {
   const label = el(
     'p',
     'reckoner__label',
-    'Roughly how much tax might have gone unpaid? Tap one to see your possible reward — optional, and you can skip it.'
+    'Roughly how much tax might be unpaid? Tap one for your possible reward — optional.'
   );
   label.id = 'reckoner-label';
   rootEl.appendChild(label);
@@ -69,11 +69,7 @@ export function renderReckoner(rootEl, draft, onBand) {
     out.textContent = 'Your possible reward: ' + money.phrase(est) + '.';
   } else {
     out.textContent =
-      'Possible reward: ' +
-      money.ceilingPhrase +
-      ', ' +
-      money.caveat +
-      '. Pick a band above for a figure closer to your situation.';
+      'Possible reward: ' + money.ceilingPhrase + ' — ' + money.caveat + '.';
   }
   rootEl.appendChild(out);
 }

@@ -19,6 +19,7 @@
 // can prefer the same override values.
 
 import { money, fragmentFor } from './data.js';
+import { showScreen } from './router.js';
 
 // --- field model -----------------------------------------------------------
 // Ordered to mirror the IRAS informant fields; each `key` doubles as the
@@ -230,8 +231,7 @@ export function renderDraft(rootEl, draft, onEdit) {
     const cta = el('button', 'draft__empty-cta', 'Start the checklist');
     cta.type = 'button';
     cta.addEventListener('click', () => {
-      const tab = document.getElementById('tab-checklist');
-      if (tab) tab.click();
+      showScreen('readiness');
     });
     empty.appendChild(cta);
     rootEl.appendChild(empty);
@@ -257,8 +257,7 @@ export function renderDraft(rootEl, draft, onEdit) {
     const back = el('button', 'draft__recognition-link', 'Finish the checklist');
     back.type = 'button';
     back.addEventListener('click', () => {
-      const tab = document.getElementById('tab-checklist');
-      if (tab) tab.click();
+      showScreen('readiness');
     });
     partial.appendChild(back);
     partial.appendChild(

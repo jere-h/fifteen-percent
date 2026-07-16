@@ -18,8 +18,6 @@ import {
   load as loadDraft,
   save as saveDraft,
   clear as clearDraft,
-  isPersistenceEnabled,
-  storageAvailable,
 } from './store.js';
 import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
@@ -27,6 +25,8 @@ import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
 import { renderSafety, renderSaveControl } from './safety.js';
 import { renderReckoner } from './reckoner.js';
+import { showScreen } from './router.js';
+import { openModal, closeModal } from './modal.js';
 
 // The one in-memory reportDraft this page treats as source of truth.
 let currentDraft = createEmptyDraft();
@@ -64,23 +64,57 @@ function updateHeroFigure(draft) {
       : money.ceilingPhrase;
 }
 
-// Reflect answered-count progress in the Checklist stepnav tab, e.g. "4/7"
-// after the index badge (TRD-11).
-function updateChecklistTab(draft) {
-  const tab = el('tab-checklist');
-  if (!tab) return;
-  const index = tab.querySelector('.stepnav__index');
-  const n = answeredCount(draft);
-  const total = ANSWER_FIELDS.length;
-  tab.textContent = '';
-  if (index) tab.appendChild(index);
-  else {
-    const span = document.createElement('span');
-    span.className = 'stepnav__index';
-    span.textContent = '1';
-    tab.appendChild(span);
+// Placeholder for the two free-text-field builders (Part 1 / Part 2). The
+// guided tap-to-draft flow that fills these lands in a later phase; for now the
+// mounts are populated with a short lead so navigation shows filled content and
+// the render pipeline (renderAll + renderDependent) already drives them.
+function renderBuilderStub(rootEl, label) {
+  if (!rootEl) return;
+  rootEl.textContent = '';
+  const note = document.createElement('p');
+  note.className = 'builder__stub';
+  note.textContent =
+    'Tap-to-draft prompts for ' + label + ' are set up in the next step. ' +
+    'You choose; the app writes the words to paste into the form.';
+  rootEl.appendChild(note);
+}
+
+// Which Home phase-menu targets are currently reachable. A fresh draft can only
+// enter the Readiness check; the drafting phases (Part 1 / Part 2 / Review) stay
+// locked until the readiness check is complete, so a first-time user sees only
+// Readiness enabled (TRD-1.3). The threshold will tighten to per-phase progress
+// once the Part 1 / Part 2 builders carry their own completion state.
+function menuReachable(draft) {
+  const readinessComplete = answeredCount(draft) >= ANSWER_FIELDS.length;
+  return {
+    readiness: true,
+    part1: readinessComplete,
+    part2: readinessComplete,
+    transfer: readinessComplete,
+  };
+}
+
+// Reflect reachability on the Home menu: enabled targets are actionable; locked
+// ones are disabled + aria-disabled, and a single hint explains why. Called from
+// both renderAll and the draft:changed path so returning Home after answering
+// shows freshly-unlocked phases.
+function updateMenuGating(draft) {
+  const reach = menuReachable(draft);
+  let anyLocked = false;
+  const items = document.querySelectorAll('.home__menu-item');
+  for (let i = 0; i < items.length; i++) {
+    const btn = items[i];
+    const enabled = !!reach[btn.dataset.target];
+    btn.disabled = !enabled;
+    if (enabled) {
+      btn.removeAttribute('aria-disabled');
+    } else {
+      btn.setAttribute('aria-disabled', 'true');
+      anyLocked = true;
+    }
   }
-  tab.appendChild(document.createTextNode(' Checklist ' + n + '/' + total));
+  const hint = el('home-menu-hint');
+  if (hint) hint.hidden = !anyLocked;
 }
 
 // Persist + recompute on band choice, then refresh the hero and dependent
@@ -105,41 +139,23 @@ function handleBand(bandId) {
   document.dispatchEvent(new CustomEvent('draft:changed'));
 }
 
-// Show a dismissible "welcome back" greeting when saving is on and prior
-// answers exist (TRD-11). Local-only; never appears when persistence is off.
-function maybeGreetReturn(draft) {
-  const host = el('welcome-back');
-  if (!host) return;
-  host.textContent = '';
-  const n = answeredCount(draft);
-  if (!(isPersistenceEnabled() && storageAvailable() && n > 0)) return;
-
-  const total = ANSWER_FIELDS.length;
-  const box = document.createElement('div');
-  box.className = 'welcome-back';
-  const msg = document.createElement('p');
-  msg.className = 'welcome-back__text';
-  msg.textContent =
-    "Welcome back — you've answered " + n + ' of ' + total + '. Picking up where you left off.';
-  box.appendChild(msg);
-
-  const dismiss = document.createElement('button');
-  dismiss.type = 'button';
-  dismiss.className = 'welcome-back__dismiss';
-  dismiss.setAttribute('aria-label', 'Dismiss welcome-back message');
-  dismiss.textContent = 'Dismiss';
-  dismiss.addEventListener('click', () => {
-    host.textContent = '';
-  });
-  box.appendChild(dismiss);
-
-  host.appendChild(box);
-}
-
 // Re-render only the sections that derive from the mutable answers/overrides:
-// the assembled draft and Transfer Mode. Cases are static; the checklist owns
-// its own interactive state; the safety panel is not answer-dependent.
+// the two free-text-field builders, the assembled draft and Transfer Mode. The
+// checklist owns its own interactive state; the safety panel is not
+// answer-dependent. Hidden screens repaint offscreen so navigation is instant.
 function renderDependent() {
+  const ft1El = el('builder-ft1');
+  if (ft1El) {
+    safeRender('builder-ft1', function () {
+      renderBuilderStub(ft1El, 'Part 1 (what happened)');
+    });
+  }
+  const ft2El = el('builder-ft2');
+  if (ft2El) {
+    safeRender('builder-ft2', function () {
+      renderBuilderStub(ft2El, 'Part 2 (how you became aware)');
+    });
+  }
   const draftEl = el('draft');
   if (draftEl) {
     safeRender('draft', function () {
@@ -152,6 +168,7 @@ function renderDependent() {
       renderTransfer(transferEl, currentDraft);
     });
   }
+  updateMenuGating(currentDraft);
 }
 
 // Called by the checklist for each answered field. Update the in-memory draft
@@ -195,11 +212,30 @@ function handleEdit(patch) {
   saveDraft(currentDraft);
 }
 
-// Wired to the Safety panel's "Clear my data" button. Remove any persisted
-// copy, then re-render the whole page from a fresh empty draft.
+// Wired to the Safety panel's "Clear my data" button. Close the safety dialog
+// (which returns #safety to its off-screen host), remove any persisted copy,
+// re-render the whole page from a fresh empty draft, and land back on Home.
 function handleClear() {
+  closeModal();
   clearDraft();
   renderAll(createEmptyDraft());
+  showScreen('home');
+}
+
+// Open the full safety/privacy panel inside the accessible modal, reached from
+// Home's quiet Privacy link. renderSafety paints into #safety (off-screen host)
+// first, then the modal borrows that node and returns it on close.
+function openSafetyModal() {
+  const safetyEl = el('safety');
+  if (!safetyEl) return;
+  safeRender('safety', function () {
+    renderSafety(safetyEl, handleClear);
+  });
+  openModal({
+    titleId: 'safety-panel-title',
+    contentNode: safetyEl,
+    invoker: el('home-privacy'),
+  });
 }
 
 // Public entry: render every non-reckoner section from the given draft and
@@ -222,7 +258,6 @@ export function renderAll(draft) {
       renderChecklist(checklistEl, currentDraft, handleChange);
     });
   }
-  updateChecklistTab(currentDraft);
 
   const saveControlEl = el('save-control');
   if (saveControlEl) {
@@ -255,15 +290,17 @@ function boot() {
   }
 
   renderAll(currentDraft);
-  maybeGreetReturn(currentDraft);
+
+  // Home's quiet Privacy link opens the full safety panel as an accessible
+  // dialog. Wired once on boot; the button lives in the persistent Home screen.
+  const privacyBtn = el('home-privacy');
+  if (privacyBtn) privacyBtn.addEventListener('click', openSafetyModal);
 
   // Any section that mutates the draft (checklist, draft edits, and the
   // standalone reckoner) dispatches 'draft:changed' on document. Re-render the
-  // dependent sections only, so we never clobber active tap/focus state, and
-  // keep the checklist tab progress badge in sync.
+  // dependent sections only, so we never clobber active tap/focus state.
   document.addEventListener('draft:changed', function () {
     renderDependent();
-    updateChecklistTab(currentDraft);
   });
 }
 

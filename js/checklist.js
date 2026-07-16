@@ -20,6 +20,7 @@
 import { checklist, fragmentFor } from './data.js';
 import { answeredCount, ANSWER_FIELDS } from './state.js';
 import * as store from './store.js';
+import { showScreen } from './router.js';
 
 export { answeredCount };
 
@@ -344,8 +345,10 @@ export function renderChecklist(rootEl, draft, onChange) {
     next.type = 'button';
     next.addEventListener('click', () => {
       if (isLast) {
-        const tab = document.getElementById('tab-draft');
-        if (tab) tab.click();
+        // Single-source the forward path through the linear FLOW: readiness ->
+        // part1 (the first drafting screen), not straight to assembly. The
+        // persistent Next bar routes the same way, so the two never diverge.
+        showScreen('part1');
       } else {
         goTo(activeIndex + 1, true);
       }

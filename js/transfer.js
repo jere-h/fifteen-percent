@@ -18,6 +18,7 @@
 import { transferMap, money, evidenceAttachments } from './data.js';
 import { writeText } from './clipboard.js';
 import { buildNarrative } from './draft.js';
+import { showScreen } from './router.js';
 
 let toastTimer = null;
 
@@ -214,8 +215,7 @@ function el(tag, className, text) {
 }
 
 function goToChecklist() {
-  const tab = document.getElementById('tab-checklist');
-  if (tab) tab.click();
+  showScreen('readiness');
 }
 
 // Build the closing "you're ready — paste and attach these files" block (TRD-17).
