@@ -244,70 +244,453 @@ export function estimateForBand(id) {
 }
 
 // ---------------------------------------------------------------------------
-// optionFragments — lowercase sentence forms for app-written prose (TRD-13)
+// freeTextBuilders — tap-first prompt trees for the two hard free-text fields
 // ---------------------------------------------------------------------------
-// The checklist stores and displays the human `label`; composeParagraph looks
-// up these fluent fragments so assembled sentences never splice a capitalised
-// button label mid-sentence. A missing fragment degrades to a lowercased label.
-const optionFragments = {
-  taxType: {
-    "Income Tax": "income tax",
-    "Goods & Services Tax (GST)": "goods and services tax (GST)",
-    "Property Tax": "property tax",
-    "Stamp Duty": "stamp duty",
-    "Not sure": "a tax type I am not sure of",
+// This is the heart of the reframed product (TRD-3): the IRAS form already
+// collects the simple structured choices itself, so the app FOCUSES on drafting
+// the two hard free-text fields the reader has to write in prose:
+//   ft1 -> "Provide as much detail as possible about the tax evasion or tax
+//           fraud."
+//   ft2 -> "Explain how and when you became aware of the tax evasion or tax
+//           fraud."
+//
+// Each builder is a small tree of tap prompts. The user CHOOSES; the app WRITES.
+// Every option carries a lowercase `fragment` so `sentence()` composes fluent
+// prose without splicing a capitalised button label mid-sentence.
+//
+// Shape (per prompt):
+//   { id, prompt, hint, multi?,
+//     options: [
+//       { label,                 // the tap button text (never composed as-is)
+//         value?,                // optional stable token (defaults to label)
+//         fragment?,             // lowercase clause spliced by sentence()
+//         unsure?,               // true -> reveals a secondary jog-memory list
+//         omitIfUnrefined?,      // true -> "I don't know" style; contributes nothing
+//         jog?: [                // more-specific possibilities for an unsure pick
+//           { label, fragment }, // a concrete, storable refinement
+//           …,
+//           { label: 'Other — type it myself', manual: true } // exactly one, last
+//         ] } … ],
+//     sentence(val) -> string }  // val = the stored fragment (or array, if multi)
+//
+// GUARANTEE (TRD-3.4): no "unsure / not sure / rather not say" placeholder ever
+// reaches a composed block. Unsure options store NOTHING until refined via their
+// jog list (a concrete fragment or the manual text); omitIfUnrefined options
+// contribute nothing at all. draft.js keeps a defensive backstop as well.
+export const freeTextBuilders = {
+  ft1: {
+    fieldLabel:
+      "Provide as much detail as possible about the tax evasion or tax fraud.",
+    part: parts.part1,
+    prompts: [
+      {
+        id: "kind",
+        prompt: "What kind of tax evasion does this involve?",
+        hint: "Pick the closest fit — the app turns it into a sentence.",
+        sentence: (f) => "This report concerns " + f + ".",
+        options: [
+          {
+            label: "Income or sales were under-reported",
+            fragment: "income or sales that were under-reported",
+          },
+          {
+            label: "Expenses or reliefs were over-claimed",
+            fragment: "expenses, deductions or reliefs that were over-claimed",
+          },
+          {
+            label: "GST was mishandled",
+            fragment: "GST that was charged, claimed or accounted for improperly",
+          },
+          {
+            label: "A tax return was never filed",
+            fragment: "a required tax return that was never filed",
+          },
+          {
+            label: "Records or documents were falsified",
+            fragment: "records, invoices or documents that were falsified",
+          },
+          {
+            label: "I'm not certain which",
+            unsure: true,
+            jog: [
+              {
+                label: "It looks like money coming in was hidden",
+                fragment:
+                  "income that appears to have been hidden from the tax authorities",
+              },
+              {
+                label: "It looks like claims were exaggerated",
+                fragment:
+                  "claims for expenses or refunds that appear to have been exaggerated",
+              },
+              {
+                label: "It looks like paperwork was faked",
+                fragment: "paperwork that appears to have been faked",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "did",
+        prompt: "What did the person or business actually do?",
+        hint: "The specific action.",
+        sentence: (f) => "In particular, " + f + ".",
+        options: [
+          {
+            label: "Left income or cash sales off the books",
+            fragment: "they left income or cash sales off their declarations",
+          },
+          {
+            label: "Inflated or invented expenses or refunds",
+            fragment: "they inflated or invented expenses or refund claims",
+          },
+          {
+            label: "Kept GST they were not entitled to",
+            fragment: "they collected or kept GST they were not entitled to",
+          },
+          {
+            label: "Altered or forged documents",
+            fragment: "they altered or forged documents",
+          },
+          {
+            label: "Ran takings through personal accounts",
+            fragment: "they ran business takings through personal accounts",
+          },
+          {
+            label: "I'd describe it differently",
+            unsure: true,
+            jog: [
+              {
+                label: "Money was taken in cash and not recorded",
+                fragment: "they took payment in cash and did not record it",
+              },
+              {
+                label: "Two different sets of figures were kept",
+                fragment: "they kept two different sets of figures",
+              },
+              {
+                label: "Sales were split to stay under a threshold",
+                fragment:
+                  "they split sales to stay under a registration threshold",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "how",
+        prompt: "How was it carried out?",
+        hint: "Pick “I don't know how” to skip this.",
+        sentence: (f) => "It was carried out by " + f + ".",
+        options: [
+          {
+            label: "Dealing in cash, no receipts",
+            fragment: "dealing in cash and not issuing receipts",
+          },
+          {
+            label: "Keeping it off the official books",
+            fragment: "keeping the activity off the official books",
+          },
+          {
+            label: "Using a separate account or name",
+            fragment: "using a separate account or business name",
+          },
+          {
+            label: "Changing figures before filing",
+            fragment: "changing the figures before anything was filed",
+          },
+          { label: "I don't know how", omitIfUnrefined: true },
+          {
+            label: "I have a rough idea",
+            unsure: true,
+            jog: [
+              {
+                label: "A side arrangement paid off the books",
+                fragment: "a side arrangement that was paid off the books",
+              },
+              {
+                label: "Under-ringing the till",
+                fragment:
+                  "under-ringing the till so recorded sales looked lower",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "amounts",
+        prompt: "Do you know the amounts or how often it happened?",
+        hint: "A rough sense is fine; exact figures are not needed.",
+        sentence: (f) => "On scale, " + f + ".",
+        options: [
+          {
+            label: "Small — low thousands",
+            fragment: "the sums involved appear to be in the low thousands",
+          },
+          {
+            label: "Moderate — tens of thousands",
+            fragment: "the sums involved appear to run into the tens of thousands",
+          },
+          {
+            label: "Large — over a hundred thousand",
+            fragment:
+              "the sums involved appear to exceed a hundred thousand dollars",
+          },
+          {
+            label: "It happens repeatedly",
+            fragment: "it appears to happen repeatedly rather than only once",
+          },
+          { label: "I don't know the amounts", omitIfUnrefined: true },
+          {
+            label: "I can give a rough figure",
+            unsure: true,
+            jog: [
+              {
+                label: "Around a few thousand dollars",
+                fragment: "the amount appears to be around a few thousand dollars",
+              },
+              {
+                label: "Around tens of thousands",
+                fragment: "the amount appears to be in the tens of thousands",
+              },
+              {
+                label: "Six figures or more",
+                fragment: "the amount appears to be six figures or more",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "timing",
+        prompt: "When did this happen?",
+        hint: "Even an approximate period helps.",
+        sentence: (f) => "As for timing, " + f + ".",
+        options: [
+          {
+            label: "Happening now",
+            fragment: "it appears to be happening now",
+          },
+          {
+            label: "Within the past year",
+            fragment: "it happened within the past year",
+          },
+          {
+            label: "One to three years ago",
+            fragment: "it happened between one and three years ago",
+          },
+          {
+            label: "More than three years ago",
+            fragment: "it happened more than three years ago",
+          },
+          {
+            label: "I'm hazy on the dates",
+            unsure: true,
+            jog: [
+              {
+                label: "Some time in the last few months",
+                fragment: "it happened at some point in the last few months",
+              },
+              {
+                label: "A year or two back, roughly",
+                fragment: "it happened roughly a year or two ago",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "whoElse",
+        prompt: "Was anyone else involved?",
+        hint: "Optional — pick “I don't know” to skip.",
+        sentence: (f) => "As for others involved, " + f + ".",
+        options: [
+          {
+            label: "One person, acting alone",
+            fragment: "it appears to be one person acting alone",
+          },
+          {
+            label: "More than one person took part",
+            fragment: "more than one person appears to have taken part",
+          },
+          {
+            label: "A business helped arrange it",
+            fragment: "a business appears to have helped arrange it",
+          },
+          { label: "I don't know", omitIfUnrefined: true },
+          {
+            label: "I suspect someone specific",
+            unsure: true,
+            jog: [
+              {
+                label: "Someone inside the business",
+                fragment: "someone inside the business appears to be involved",
+              },
+              {
+                label: "An outside adviser or agent",
+                fragment: "an outside adviser or agent appears to be involved",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+    ],
   },
-  offenceNature: {
-    "Income or sales not being declared": "income or sales not being declared",
-    "False or inflated expense or refund claims":
-      "false or inflated expense or refund claims",
-    "Records or documents that look falsified":
-      "records or documents that appear falsified",
-    "Something else that seems off": "something else that seems off",
-  },
-  taxpayerDetailsKnown: {
-    "I have a full name or registered business":
-      "a full name or registered business",
-    "I have partial details only": "partial details only",
-    "I only know it happened, not who":
-      "only knowledge that it happened, not who is responsible",
-  },
-  timePeriod: {
-    "Currently ongoing": "appears to be ongoing",
-    "Within the last year": "relates to the last year",
-    "One to three years ago": "relates to one to three years ago",
-    "More than three years ago":
-      "relates to something more than three years ago",
-    "Unsure of the dates": "relates to a period I am unsure of",
-  },
-  evidenceInHand: {
-    "Invoices or receipts": "invoices or receipts",
-    "Bank or payment records": "bank or payment records",
-    "Messages or emails": "messages or emails",
-    "Photos or screenshots": "photos or screenshots",
-    "Contracts or agreements": "contracts or agreements",
-    "What I saw or overheard in person": "what I saw or overheard in person",
-    "Nothing kept yet, only my account": "only my own account of events",
-  },
-  relationship: {
-    "Through my work or former work": "through my work or former work",
-    "As a customer or supplier": "as a customer or supplier",
-    "Personal or family connection": "through a personal or family connection",
-    "I would rather not say": "in a way I would rather not detail",
-  },
-  identifyForReward: {
-    "Yes, I will provide contact details":
-      "I am willing to be contacted and provide details for a possible reward",
-    "No, I want to stay anonymous": "I prefer to stay anonymous",
-    "Undecided for now": "I am undecided about being identified for a reward",
+  ft2: {
+    fieldLabel:
+      "Explain how and when you became aware of the tax evasion or tax fraud.",
+    part: parts.part2,
+    prompts: [
+      {
+        id: "vantage",
+        prompt: "What was your position in relation to this?",
+        hint: "How you were placed to notice it.",
+        sentence: (f) => "I came to know about this " + f + ".",
+        options: [
+          {
+            label: "Employee, current or former",
+            fragment: "as a current or former employee",
+          },
+          {
+            label: "Business partner or associate",
+            fragment: "as a business partner or associate",
+          },
+          {
+            label: "Customer or client",
+            fragment: "as a customer or client",
+          },
+          {
+            label: "Supplier or contractor",
+            fragment: "as a supplier or contractor",
+          },
+          {
+            label: "Personal or family connection",
+            fragment: "through a personal or family connection",
+          },
+          {
+            label: "Same line of work",
+            fragment: "as someone working in the same trade",
+          },
+          {
+            label: "I'd prefer not to be specific",
+            unsure: true,
+            jog: [
+              {
+                label: "Someone close to the business",
+                fragment: "as someone with a close connection to the business",
+              },
+              {
+                label: "Someone who dealt with them occasionally",
+                fragment: "as someone who dealt with them from time to time",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "when",
+        prompt: "When did you become aware of it?",
+        hint: "Roughly is fine.",
+        sentence: (f) => "I became aware of it " + f + ".",
+        options: [
+          {
+            label: "In the past few weeks",
+            fragment: "within the past few weeks",
+          },
+          {
+            label: "In the past few months",
+            fragment: "within the past few months",
+          },
+          {
+            label: "Within the past year",
+            fragment: "within the past year",
+          },
+          {
+            label: "More than a year ago",
+            fragment: "more than a year ago",
+          },
+          {
+            label: "I can't pin the date",
+            unsure: true,
+            jog: [
+              {
+                label: "Around an event I remember",
+                fragment: "around the time of an event I clearly remember",
+              },
+              {
+                label: "Some time last year",
+                fragment: "at some point last year",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "howKnown",
+        prompt: "How did you come to know?",
+        hint: "What you saw, handled or were told.",
+        sentence: (f) => "I know about it because " + f + ".",
+        options: [
+          {
+            label: "I saw it happen myself",
+            fragment: "I saw it happen myself",
+          },
+          {
+            label: "I handled the records or money",
+            fragment: "I handled the records or money involved",
+          },
+          {
+            label: "Someone who took part told me",
+            fragment: "someone who took part told me directly",
+          },
+          {
+            label: "I found it in documents or messages",
+            fragment:
+              "I came across it in documents or messages I had access to",
+          },
+          {
+            label: "It was a mix of things",
+            unsure: true,
+            jog: [
+              {
+                label: "I noticed a pattern over time",
+                fragment:
+                  "I noticed a pattern in what I was seeing over time",
+              },
+              {
+                label: "I overheard it discussed",
+                fragment: "I overheard it being discussed",
+              },
+              { label: "Other — type it myself", manual: true },
+            ],
+          },
+        ],
+      },
+      {
+        id: "ongoing",
+        prompt: "As far as you know, is it still going on?",
+        hint: "Pick “I don't know” to skip.",
+        sentence: (f) => "As far as I am aware, " + f + ".",
+        options: [
+          { label: "Still going on", fragment: "it is still going on" },
+          { label: "Has stopped", fragment: "it has since stopped" },
+          {
+            label: "Was a one-off",
+            fragment: "it appears to have been a one-off",
+          },
+          { label: "I don't know", omitIfUnrefined: true },
+        ],
+      },
+    ],
   },
 };
-
-// Look up the fluent fragment for a field/label pair, degrading to a lowercased
-// label when no fragment is defined so a sentence never breaks.
-export function fragmentFor(field, label) {
-  const map = optionFragments[field] || {};
-  if (Object.prototype.hasOwnProperty.call(map, label)) return map[label];
-  return String(label == null ? "" : label).toLowerCase();
-}
 

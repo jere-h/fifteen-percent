@@ -1,163 +1,119 @@
 // js/draft.js
-// Assembled Draft section for "Fifteen Percent".
+// Assembled Draft (Review) section for "Fifteen Percent".
 //
-// Turns the in-memory reportDraft into an editable plain-language narrative:
-// a single lead paragraph plus a details table that mirrors the IRAS informant
-// fields. Every line is inline-editable; edits are captured as overrides
-// (narrativeOverride for the paragraph, fieldOverrides[draftKey] for a row) so
-// Transfer Mode emits the hand-edited wording rather than the auto-composed
-// text.
+// Turns the in-memory reportDraft into the TWO paste-ready free-text blocks the
+// IRAS form asks the reader to write in prose (FT-1 "what happened", FT-2 "how
+// and when you became aware"). Each block is labelled with its EXACT form field
+// name and shows the app-composed prose. The whole block is inline-editable; a
+// hand edit is captured as freeText[key].override so it wins over the composed
+// text without being lost.
 //
-// buildNarrative(draft) is a pure function (no DOM) returning
-//   { paragraph:string, detailsRows:Array<{label,value}> }
-// for snapshot tests. With no answers the section renders the specific
-// empty-state prompt 'Start the checklist to build your report' (the one
-// warm-gradient-orb hero moment) rather than a blank area.
+// buildNarrative(draft) is a pure, DOM-free function returning the two-field
+// model:
+//   { ft1: { label, text }, ft2: { label, text } }
+// where label is the exact form label from freeTextBuilders and text is composed
+// by joining each prompt's sentence() over the stored REFINED answers (an unsure
+// pick that was never refined stores nothing, so no "unsure" placeholder can
+// ever be composed). A whole-block override wins over the composed text.
 //
-// Contract: exports buildNarrative(draft) and renderDraft(rootEl, draft, onEdit).
-// draftKeys used for fieldOverrides match the answer field names so transfer.js
-// can prefer the same override values.
+// Contract (UNCHANGED signatures): exports buildNarrative(draft) and
+// renderDraft(rootEl, draft, onEdit).
 
-import { money, fragmentFor } from './data.js';
+import { freeTextBuilders } from './data.js';
 import { showScreen } from './router.js';
 
-// --- field model -----------------------------------------------------------
-// Ordered to mirror the IRAS informant fields; each `key` doubles as the
-// fieldOverrides draftKey shared with Transfer Mode.
-const FIELDS = [
-  { key: 'taxType', label: 'Type of tax', list: false },
-  { key: 'offenceNature', label: 'Nature of the suspected offence', list: false },
-  { key: 'taxpayerDetailsKnown', label: 'Details known about the person or business', list: false },
-  { key: 'timePeriod', label: 'Time period involved', list: false },
-  { key: 'evidenceInHand', label: 'Evidence currently in hand', list: true },
-  { key: 'relationship', label: 'Your connection to the matter', list: false },
-  { key: 'identifyForReward', label: 'Willing to be identified for a possible reward', list: false },
-];
+// Final defensive backstop (TRD-3.4): even though an "unsure/not sure/rather not
+// say" value is never STORED (the builder only commits refined fragments), drop
+// any fragment or composed sentence that still matches, so such a placeholder can
+// never reach a block. The primary guarantee lives in the builder + prompt tree.
+const BANNED = /\b(unsure|not sure|rather not say)\b/i;
 
-const REWARD_KEY = 'rewardEstimate';
-const REWARD_LABEL = 'Indicative discretionary reward';
+const KEYS = ['ft1', 'ft2'];
 
-// --- pure helpers -----------------------------------------------------------
+// A prompt's sentence() hard-codes a linking adverbial ("In particular,",
+// "As for timing,", …) that presumes a preceding sentence. When an earlier
+// prompt is skipped or abandoned, a later sentence can land FIRST in the block
+// and open with a stranded connector. On the first emitted sentence only, strip
+// a known leading connective and re-capitalise, so the block always opens with a
+// clean standalone clause (IP3-2). Never alters banned-word handling.
+const LEADING_CONNECTOR =
+  /^(in particular,|as for timing,|as for others involved,|as far as i am aware,|on scale,)\s+/i;
 
-// Join fragments into a natural list: "a", "a and b", "a, b and c".
-function joinList(items) {
-  const arr = items.filter((s) => s != null && String(s).trim() !== '');
-  if (arr.length === 0) return '';
-  if (arr.length === 1) return arr[0];
-  if (arr.length === 2) return arr[0] + ' and ' + arr[1];
-  return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
+function destrandFirst(sentence) {
+  const stripped = sentence.replace(LEADING_CONNECTOR, '');
+  if (stripped === sentence) return sentence;
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
 }
 
-// Resolve every field to a plain string, letting a saved per-field override
-// win over the raw checklist answer.
-function resolvedValues(draft) {
-  const answers = (draft && draft.answers) || {};
-  const overrides = (draft && draft.fieldOverrides) || {};
-  const out = {};
-  for (const f of FIELDS) {
-    const raw = answers[f.key];
+// --- pure composition -------------------------------------------------------
+
+// Compose one free-text block from the stored refined answers. Joins each
+// prompt's sentence() over its stored fragment (or array of fragments, for a
+// multi prompt), omitting any prompt with no stored/refined value. Never emits a
+// banned placeholder.
+function composeBlock(draft, key) {
+  const cfg = freeTextBuilders[key];
+  if (!cfg || !Array.isArray(cfg.prompts)) return '';
+  const ft = (draft && draft.freeText && draft.freeText[key]) || {};
+  const answers = ft.answers && typeof ft.answers === 'object' ? ft.answers : {};
+
+  const sentences = [];
+  for (const prompt of cfg.prompts) {
+    if (!prompt || !prompt.id || typeof prompt.sentence !== 'function') continue;
+    const raw = answers[prompt.id];
+    if (raw == null) continue;
+
     let val;
-    if (f.list) {
-      val = Array.isArray(raw) && raw.length ? raw.join(', ') : '';
+    if (Array.isArray(raw)) {
+      const frags = raw
+        .map((v) => (v == null ? '' : String(v).trim()))
+        .filter((v) => v !== '' && !BANNED.test(v));
+      if (!frags.length) continue;
+      val = frags;
     } else {
-      val = raw == null ? '' : String(raw);
+      const s = String(raw).trim();
+      if (s === '' || BANNED.test(s)) continue;
+      val = s;
     }
-    const ov = overrides[f.key];
-    if (ov != null && String(ov).trim() !== '') val = String(ov);
-    out[f.key] = val;
-  }
-  // Reckoner reward, co-rendered with its discretionary disclaimer.
-  const est = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
-  const rewardOv = overrides[REWARD_KEY];
-  if (rewardOv != null && String(rewardOv).trim() !== '') {
-    out[REWARD_KEY] = String(rewardOv);
-  } else if (typeof est === 'number' && isFinite(est) && est > 0) {
-    out[REWARD_KEY] = money.phrase(est);
-  } else {
-    out[REWARD_KEY] = '';
-  }
-  return out;
-}
 
-// Rows with their draftKey attached, used by both buildNarrative and renderDraft.
-function detailRowsWithKeys(draft) {
-  const v = resolvedValues(draft);
-  const rows = [];
-  for (const f of FIELDS) {
-    if (v[f.key]) rows.push({ key: f.key, label: f.label, value: v[f.key] });
-  }
-  if (v[REWARD_KEY]) rows.push({ key: REWARD_KEY, label: REWARD_LABEL, value: v[REWARD_KEY] });
-  return rows;
-}
-
-// Compose the lead paragraph from fluent per-option fragments (TRD-13) rather
-// than splicing raw capitalised button labels. Reads the raw answers directly
-// so each fragment can be looked up; the whole-paragraph hand edit lives in
-// narrativeOverride (handled by buildNarrative).
-function composeParagraph(draft) {
-  const a = (draft && draft.answers) || {};
-  const parts = [];
-
-  const taxType = a.taxType;
-  const offence = a.offenceNature;
-  if (taxType || offence) {
-    let opening = 'I would like to report a suspected tax offence';
-    if (taxType) opening += ' relating to ' + fragmentFor('taxType', taxType);
-    if (offence) {
-      opening +=
-        (taxType ? ', ' : ' ') +
-        'specifically ' +
-        fragmentFor('offenceNature', offence);
+    let sentence;
+    try {
+      sentence = prompt.sentence(val);
+    } catch (err) {
+      sentence = '';
     }
-    parts.push(opening + '.');
+    if (sentence == null) continue;
+    const clean = String(sentence).trim();
+    if (clean === '' || BANNED.test(clean)) continue;
+    sentences.push(sentences.length === 0 ? destrandFirst(clean) : clean);
   }
-  if (a.taxpayerDetailsKnown) {
-    parts.push(
-      'About who is involved, I have ' +
-        fragmentFor('taxpayerDetailsKnown', a.taxpayerDetailsKnown) +
-        '.'
-    );
-  }
-  if (a.timePeriod) {
-    parts.push('The conduct ' + fragmentFor('timePeriod', a.timePeriod) + '.');
-  }
-  const evidence = a.evidenceInHand;
-  if (Array.isArray(evidence) && evidence.length) {
-    const frags = evidence.map((e) => fragmentFor('evidenceInHand', e));
-    parts.push('I currently hold ' + joinList(frags) + '.');
-  }
-  if (a.relationship) {
-    parts.push(
-      'I came to know about this ' +
-        fragmentFor('relationship', a.relationship) +
-        '.'
-    );
-  }
-  if (a.identifyForReward) {
-    parts.push(
-      'On a possible reward, ' +
-        fragmentFor('identifyForReward', a.identifyForReward) +
-        '.'
-    );
-  }
-  return parts.join(' ');
+  return sentences.join(' ');
 }
 
 /**
- * Pure. Returns the plain-language draft as { paragraph, detailsRows }.
- * paragraph honours a saved narrativeOverride; detailsRows honour per-field
- * overrides. Snapshot-testable and DOM-free.
+ * Pure. Returns the two-field model:
+ *   { ft1: { label, text }, ft2: { label, text } }
+ * label = the exact form label from freeTextBuilders; text = the whole-block
+ * override when non-empty, else the composed prose. DOM-free and
+ * snapshot-testable. An empty draft yields empty text for both blocks.
  */
 export function buildNarrative(draft) {
   const safe = draft || {};
-  const keyedRows = detailRowsWithKeys(safe);
-  const detailsRows = keyedRows.map((r) => ({ label: r.label, value: r.value }));
-  const override = safe.narrativeOverride;
-  const paragraph =
-    override != null && String(override).trim() !== ''
-      ? String(override)
-      : composeParagraph(safe);
-  return { paragraph, detailsRows };
+  const out = {};
+  for (const key of KEYS) {
+    const cfg = freeTextBuilders[key];
+    const label = cfg ? cfg.fieldLabel : '';
+    const ft = (safe.freeText && safe.freeText[key]) || {};
+    const override = ft.override;
+    let text;
+    if (override != null && String(override).trim() !== '') {
+      text = String(override).trim();
+    } else {
+      text = composeBlock(safe, key);
+    }
+    out[key] = { label, text };
+  }
+  return out;
 }
 
 // --- DOM rendering ----------------------------------------------------------
@@ -173,11 +129,13 @@ function emitChanged() {
   document.dispatchEvent(new CustomEvent('draft:changed'));
 }
 
-// Wire a contenteditable element to commit its trimmed text via `commit(text)`
-// on blur (and Enter, when singleLine), only when the value actually changed.
-function makeEditable(node, initial, singleLine, commit) {
+// Wire a contenteditable element to commit its trimmed text via commit(text) on
+// blur, only when the value actually changed. Shared pattern with the builder's
+// manual input (TRD-3.2).
+function makeEditable(node, initial, commit) {
   node.contentEditable = 'true';
   node.setAttribute('role', 'textbox');
+  node.setAttribute('aria-multiline', 'true');
   node.setAttribute('spellcheck', 'true');
   node.tabIndex = 0;
   node.textContent = initial;
@@ -188,130 +146,116 @@ function makeEditable(node, initial, singleLine, commit) {
       commit(next);
     }
   });
-
-  if (singleLine) {
-    node.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        node.blur();
-      }
-    });
-  }
 }
 
 /**
- * Render the Assembled Draft into rootEl (#draft). Inline edits call
- * onEdit(patch) with a fully-merged override object so a shallow top-level
- * merge by the caller is safe, then dispatch 'draft:changed'.
+ * Render the two-block Review into rootEl (#draft). Each block shows its exact
+ * IRAS form field label and the app-written prose; editing a block calls
+ * onEdit({ key, override }) with the hand-edited text (empty string clears the
+ * override), then dispatches 'draft:changed'.
  */
 export function renderDraft(rootEl, draft, onEdit) {
   if (!rootEl) return;
   const safe = draft || {};
   const emit = typeof onEdit === 'function' ? onEdit : function () {};
 
-  const { paragraph } = buildNarrative(safe);
-  const keyedRows = detailRowsWithKeys(safe);
-  const hasContent = keyedRows.length > 0 || (paragraph && paragraph.trim().length > 0);
+  const model = buildNarrative(safe);
+  const filled = KEYS.filter((k) => model[k].text && model[k].text.trim() !== '');
 
   rootEl.innerHTML = '';
 
-  const eyebrow = el('p', 'eyebrow', 'Assembled draft');
-  rootEl.appendChild(eyebrow);
+  rootEl.appendChild(el('p', 'eyebrow', 'Review your draft'));
 
-  const heading = el('h2', null, 'Your report, in plain words');
+  const heading = el('h2', null, 'Your two paste-ready blocks');
   heading.id = 'draft-heading';
-  heading.tabIndex = -1; // TRD-8 focus target on view switch
+  heading.tabIndex = -1; // focus target on screen switch (router)
   rootEl.appendChild(heading);
 
-  if (!hasContent) {
+  // Empty state — the single warm-gradient-orb hero moment. Actionable path
+  // forward rather than a dead end.
+  if (!filled.length) {
     const empty = el('div', 'draft__empty');
     empty.setAttribute('role', 'status');
-    empty.appendChild(el('p', null, 'Start the checklist to build your report'));
-    // Actionable path forward, not a dead end (TRD-18).
-    const cta = el('button', 'draft__empty-cta', 'Start the checklist');
+    empty.appendChild(
+      el('p', null, 'Draft the two parts to build your report')
+    );
+    const cta = el('button', 'draft__empty-cta', 'Start Part 1');
     cta.type = 'button';
     cta.addEventListener('click', () => {
-      showScreen('readiness');
+      showScreen('part1');
     });
     empty.appendChild(cta);
     rootEl.appendChild(empty);
     return;
   }
 
-  // Framed partial state: recognise progress rather than showing a bare
-  // fragment (TRD-15). answeredCount comes from the seven checklist fields.
-  const total = FIELDS.length;
-  const ready = FIELDS.reduce((acc, f) => {
-    const raw = safe.answers && safe.answers[f.key];
-    const filled = f.list
-      ? Array.isArray(raw) && raw.length > 0
-      : raw != null && String(raw).trim() !== '';
-    return acc + (filled ? 1 : 0);
-  }, 0);
-  if (ready < total) {
+  // Recognition of progress: how many of the two blocks are drafted, with a path
+  // back to finish the other.
+  if (filled.length < KEYS.length) {
     const partial = el('p', 'draft__recognition');
     partial.setAttribute('role', 'status');
     partial.appendChild(
-      document.createTextNode(ready + ' of ' + total + ' answers so far. ')
+      document.createTextNode(filled.length + ' of ' + KEYS.length + ' blocks drafted so far. ')
     );
-    const back = el('button', 'draft__recognition-link', 'Finish the checklist');
+    const missing = KEYS.indexOf('ft1') === -1 || model.ft1.text.trim() !== '' ? 'part2' : 'part1';
+    const back = el('button', 'draft__recognition-link', 'Finish the other part');
     back.type = 'button';
     back.addEventListener('click', () => {
-      showScreen('readiness');
+      showScreen(missing);
     });
     partial.appendChild(back);
     partial.appendChild(
-      document.createTextNode(' to fill in the rest — your draft grows as you go.')
+      document.createTextNode(' — your report grows as you go.')
     );
     rootEl.appendChild(partial);
   }
 
-  const note = el(
-    'p',
-    'draft__note',
-    'Tap any line to reword it. Your edits are kept and used by Transfer Mode.'
+  rootEl.appendChild(
+    el(
+      'p',
+      'draft__note',
+      'Tap a block to reword it. Your edits are kept and used when you copy into the form.'
+    )
   );
-  rootEl.appendChild(note);
 
   const container = el('div', 'draft');
 
-  // Editable lead paragraph -> narrativeOverride.
-  const p = el('div', 'draft__paragraph');
-  p.setAttribute('aria-label', 'Editable report narrative');
-  makeEditable(p, paragraph, false, (text) => {
-    emit({ narrativeOverride: text });
-    emitChanged();
+  KEYS.forEach((key) => {
+    const block = model[key];
+    const cfg = freeTextBuilders[key];
+    const section = el('section', 'draft__block');
+
+    // The EXACT IRAS form field label so the reader knows where each block goes.
+    const labelId = 'draft-block-label-' + key;
+    const labelEl = el('p', 'draft__block-label', 'Form field: “' + block.label + '”');
+    labelEl.id = labelId;
+    section.appendChild(labelEl);
+
+    const hasText = block.text && block.text.trim() !== '';
+    if (hasText) {
+      const body = el('div', 'draft__block-text');
+      body.setAttribute('aria-labelledby', labelId);
+      makeEditable(body, block.text, (text) => {
+        emit({ key: key, override: text });
+        emitChanged();
+      });
+      section.appendChild(body);
+    } else {
+      const gap = el('p', 'draft__block-gap');
+      gap.appendChild(
+        document.createTextNode('Not drafted yet. ')
+      );
+      const go = el('button', 'draft__recognition-link', cfg && cfg.part ? 'Draft this part' : 'Draft this part');
+      go.type = 'button';
+      go.addEventListener('click', () => {
+        showScreen(key === 'ft1' ? 'part1' : 'part2');
+      });
+      gap.appendChild(go);
+      section.appendChild(gap);
+    }
+
+    container.appendChild(section);
   });
-  container.appendChild(p);
 
-  // Details table: one editable value per field -> fieldOverrides[draftKey].
-  const table = el('div', 'draft__table');
-  const currentOverrides = safe.fieldOverrides || {};
-
-  for (const row of keyedRows) {
-    const rowEl = el('div', 'draft__row');
-
-    const label = el('div', 'draft__label', row.label);
-    label.id = 'draft-label-' + row.key;
-    rowEl.appendChild(label);
-
-    const field = el('div', 'draft__field');
-    field.setAttribute('aria-labelledby', label.id);
-    makeEditable(field, row.value, true, (text) => {
-      const merged = Object.assign({}, currentOverrides);
-      if (text === '') {
-        delete merged[row.key];
-      } else {
-        merged[row.key] = text;
-      }
-      emit({ fieldOverrides: merged });
-      emitChanged();
-    });
-    rowEl.appendChild(field);
-
-    table.appendChild(rowEl);
-  }
-
-  container.appendChild(table);
   rootEl.appendChild(container);
 }

@@ -1090,12 +1090,167 @@ p {
   cursor: pointer;
 }
 
-/* Placeholder for the Part 1 / Part 2 free-text builders (filled in a later
-   phase). */
-.builder__stub {
+/* -------------------------------------- Free-text builders (TRD-3.2) */
+/* The two tap-first free-text field builders. Reuses the checklist stepper
+   primitives (.checklist__step / __radio / __options / __nav / __summaries) for
+   a consistent look; the classes below add the destination label, the secondary
+   jog-memory reveal, the manual input and the live preview. */
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.builder__field-label {
   margin: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.builder__field-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.builder__wizard {
+  gap: var(--space-4);
+}
+
+/* The secondary jog-memory list: more-specific possibilities, revealed inline
+   under the "I'm not sure" option. Set off with an accent rule so it reads as a
+   nested step, never an equal sibling. Hidden until revealed (no animation, so
+   reduced-motion is honoured for free). */
+.builder__jog {
+  margin: var(--space-3) 0 var(--space-2);
+  padding: var(--space-3) 0 var(--space-2) var(--space-4);
+  border-left: 3px solid var(--color-accent-strong);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.builder__jog[hidden] {
+  display: none;
+}
+
+.builder__jog-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.builder__manual-input {
+  margin-top: var(--space-1);
+}
+
+.builder__manual-input[hidden] {
+  display: none;
+}
+
+/* Live preview of the growing paste-ready block. */
+.builder__preview {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.builder__preview-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.builder__preview-text {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--color-fg);
+  overflow-wrap: anywhere;
+}
+
+.builder__preview-text--empty {
   color: var(--color-muted);
   font-style: italic;
+}
+
+.builder__done-note {
+  margin: 0;
+  align-self: center;
+  font-size: 1rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* ---------------------------------- Review two-block model (TRD-3.3) */
+.draft__note {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.draft__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.draft__block:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.draft__block-label {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.draft__block-text {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  padding: var(--space-3);
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm);
+  cursor: text;
+  overflow-wrap: anywhere;
+  transition: border-color .2s var(--ease-soft), background .2s var(--ease-soft);
+}
+
+.draft__block-text:hover,
+.draft__block-text:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  outline: none;
+}
+
+.draft__block-text:focus-visible {
+  border-color: var(--color-accent);
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(232, 85, 127, .18);
+}
+
+.draft__block-gap {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
 }
 
 /* ---------------------------------------------------------------- Modal */

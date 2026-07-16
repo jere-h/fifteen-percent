@@ -22,7 +22,7 @@ import {
 import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
 import { renderRedirect } from './gate.js';
-import { renderPartHeaders } from './builders.js';
+import { renderPartHeaders, renderBuilder } from './builders.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
 import { renderSafety, renderSaveControl } from './safety.js';
@@ -64,21 +64,6 @@ function updateHeroFigure(draft) {
     typeof est === 'number' && isFinite(est) && est > 0
       ? money.format(est)
       : money.ceilingPhrase;
-}
-
-// Placeholder for the two free-text-field builders (Part 1 / Part 2). The
-// guided tap-to-draft flow that fills these lands in a later phase; for now the
-// mounts are populated with a short lead so navigation shows filled content and
-// the render pipeline (renderAll + renderDependent) already drives them.
-function renderBuilderStub(rootEl, label) {
-  if (!rootEl) return;
-  rootEl.textContent = '';
-  const note = document.createElement('p');
-  note.className = 'builder__stub';
-  note.textContent =
-    'Tap-to-draft prompts for ' + label + ' are set up in the next step. ' +
-    'You choose; the app writes the words to paste into the form.';
-  rootEl.appendChild(note);
 }
 
 // Which Home phase-menu targets are currently reachable. A fresh draft can only
@@ -144,23 +129,14 @@ function handleBand(bandId) {
   document.dispatchEvent(new CustomEvent('draft:changed'));
 }
 
-// Re-render only the sections that derive from the mutable answers/overrides:
-// the two free-text-field builders, the assembled draft and Transfer Mode. The
-// checklist owns its own interactive state; the safety panel is not
-// answer-dependent. Hidden screens repaint offscreen so navigation is instant.
+// Re-render only the sections that DERIVE from the mutable answers/overrides:
+// the assembled two-block Review and Transfer Mode. The checklist AND the two
+// free-text builders own their own interactive step state (rendered once in
+// renderAll), so they are deliberately NOT repainted here — that preserves
+// tap/focus place while their live previews and the Review update. The safety
+// panel is not answer-dependent. Hidden screens repaint offscreen so navigation
+// is instant.
 function renderDependent() {
-  const ft1El = el('builder-ft1');
-  if (ft1El) {
-    safeRender('builder-ft1', function () {
-      renderBuilderStub(ft1El, 'Part 1 (what happened)');
-    });
-  }
-  const ft2El = el('builder-ft2');
-  if (ft2El) {
-    safeRender('builder-ft2', function () {
-      renderBuilderStub(ft2El, 'Part 2 (how you became aware)');
-    });
-  }
   const draftEl = el('draft');
   if (draftEl) {
     safeRender('draft', function () {
@@ -181,6 +157,14 @@ function renderDependent() {
 // the legacy draft.answers map (kept for back-compat). The checklist itself
 // dispatches 'draft:changed', which drives the dependent re-render.
 function handleChange(field, value) {
+  // The free-text builders mutate draft.freeText[key].answers themselves (and
+  // persist), so here we only re-touch + persist as the orchestrator's belt-and-
+  // braces. The builder already dispatched 'draft:changed'.
+  if (typeof field === 'string' && field.indexOf('freeText.') === 0) {
+    touch(currentDraft);
+    saveDraft(currentDraft);
+    return;
+  }
   if (typeof field === 'string' && field.indexOf('readiness.') === 0) {
     if (!currentDraft.readiness || typeof currentDraft.readiness !== 'object') {
       currentDraft.readiness = {
@@ -239,31 +223,28 @@ function renderRedirectScreen() {
   });
 }
 
-// Called by the draft section for per-field inline edits, captured as
-// overrides so Transfer Mode can emit the hand-edited text. The patch may set
-// narrativeOverride and/or per-field entries under fieldOverrides (and, for
-// safety, direct answers). draft.js dispatches 'draft:changed' after the edit,
-// so we only apply + persist here and let the listener re-render.
+// Called by the Review section for a whole-block hand edit, captured as
+// draft.freeText[key].override so the composed prose is overridden but never
+// lost (TRD-3.3). The patch is { key:'ft1'|'ft2', override:string } — an empty
+// override string clears back to the composed text. draft.js dispatches
+// 'draft:changed' after the edit, so we only apply + persist here.
 function handleEdit(patch) {
   if (!patch || typeof patch !== 'object') return;
+  const key = patch.key;
+  if (key !== 'ft1' && key !== 'ft2') return;
 
-  if (Object.prototype.hasOwnProperty.call(patch, 'narrativeOverride')) {
-    currentDraft.narrativeOverride = patch.narrativeOverride;
+  if (!currentDraft.freeText || typeof currentDraft.freeText !== 'object') {
+    currentDraft.freeText = {
+      ft1: { answers: {}, override: null },
+      ft2: { answers: {}, override: null },
+    };
   }
-  if (patch.fieldOverrides && typeof patch.fieldOverrides === 'object') {
-    currentDraft.fieldOverrides = Object.assign(
-      {},
-      currentDraft.fieldOverrides || {},
-      patch.fieldOverrides
-    );
+  if (!currentDraft.freeText[key] || typeof currentDraft.freeText[key] !== 'object') {
+    currentDraft.freeText[key] = { answers: {}, override: null };
   }
-  if (patch.answers && typeof patch.answers === 'object') {
-    currentDraft.answers = Object.assign(
-      {},
-      currentDraft.answers || {},
-      patch.answers
-    );
-  }
+  const text = patch.override == null ? '' : String(patch.override).trim();
+  currentDraft.freeText[key].override = text === '' ? null : text;
+
   touch(currentDraft);
   saveDraft(currentDraft);
 }
@@ -319,6 +300,22 @@ export function renderAll(draft) {
   safeRender('part-headers', function () {
     renderPartHeaders();
   });
+
+  // The two free-text builders own their own stepper state, so they render once
+  // here (not in renderDependent) and survive the draft:changed re-render just
+  // like the checklist does.
+  const ft1El = el('builder-ft1');
+  if (ft1El) {
+    safeRender('builder-ft1', function () {
+      renderBuilder(ft1El, currentDraft, 'ft1', handleChange);
+    });
+  }
+  const ft2El = el('builder-ft2');
+  if (ft2El) {
+    safeRender('builder-ft2', function () {
+      renderBuilder(ft2El, currentDraft, 'ft2', handleChange);
+    });
+  }
 
   const saveControlEl = el('save-control');
   if (saveControlEl) {
