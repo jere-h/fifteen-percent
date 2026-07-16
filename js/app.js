@@ -13,12 +13,20 @@
 //   - Expose renderAll(draft), used by the Safety panel's Clear to return the
 //     whole page to its empty state.
 
-import { createEmptyDraft } from './state.js';
-import { load as loadDraft, save as saveDraft, clear as clearDraft } from './store.js';
+import { createEmptyDraft, answeredCount, ANSWER_FIELDS } from './state.js';
+import {
+  load as loadDraft,
+  save as saveDraft,
+  clear as clearDraft,
+  isPersistenceEnabled,
+  storageAvailable,
+} from './store.js';
+import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
-import { renderSafety } from './safety.js';
+import { renderSafety, renderSaveControl } from './safety.js';
+import { renderReckoner } from './reckoner.js';
 
 // The one in-memory reportDraft this page treats as source of truth.
 let currentDraft = createEmptyDraft();
@@ -42,6 +50,90 @@ function safeRender(label, fn) {
 
 function touch(draft) {
   draft.updatedAt = new Date().toISOString();
+}
+
+// Overwrite the hero's injected figure with the personalised "up to ~S$X" when
+// a numeric estimate exists, else the generic ceiling phrase (TRD-4).
+function updateHeroFigure(draft) {
+  const figure = el('hero-figure');
+  if (!figure) return;
+  const est = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
+  figure.textContent =
+    typeof est === 'number' && isFinite(est) && est > 0
+      ? money.format(est)
+      : money.ceilingPhrase;
+}
+
+// Reflect answered-count progress in the Checklist stepnav tab, e.g. "4/7"
+// after the index badge (TRD-11).
+function updateChecklistTab(draft) {
+  const tab = el('tab-checklist');
+  if (!tab) return;
+  const index = tab.querySelector('.stepnav__index');
+  const n = answeredCount(draft);
+  const total = ANSWER_FIELDS.length;
+  tab.textContent = '';
+  if (index) tab.appendChild(index);
+  else {
+    const span = document.createElement('span');
+    span.className = 'stepnav__index';
+    span.textContent = '1';
+    tab.appendChild(span);
+  }
+  tab.appendChild(document.createTextNode(' Checklist ' + n + '/' + total));
+}
+
+// Persist + recompute on band choice, then refresh the hero and dependent
+// sections. recoverableInput holds the raw band id; rewardEstimate is DERIVED
+// and never trusted from storage.
+function handleBand(bandId) {
+  if (!currentDraft.reckoner || typeof currentDraft.reckoner !== 'object') {
+    currentDraft.reckoner = { recoverableInput: '', rewardEstimate: null };
+  }
+  currentDraft.reckoner.recoverableInput = bandId || '';
+  currentDraft.reckoner.rewardEstimate = estimateForBand(bandId);
+  touch(currentDraft);
+  saveDraft(currentDraft);
+
+  const reckonerEl = el('reckoner');
+  if (reckonerEl) {
+    safeRender('reckoner', function () {
+      renderReckoner(reckonerEl, currentDraft, handleBand);
+    });
+  }
+  updateHeroFigure(currentDraft);
+  document.dispatchEvent(new CustomEvent('draft:changed'));
+}
+
+// Show a dismissible "welcome back" greeting when saving is on and prior
+// answers exist (TRD-11). Local-only; never appears when persistence is off.
+function maybeGreetReturn(draft) {
+  const host = el('welcome-back');
+  if (!host) return;
+  host.textContent = '';
+  const n = answeredCount(draft);
+  if (!(isPersistenceEnabled() && storageAvailable() && n > 0)) return;
+
+  const total = ANSWER_FIELDS.length;
+  const box = document.createElement('div');
+  box.className = 'welcome-back';
+  const msg = document.createElement('p');
+  msg.className = 'welcome-back__text';
+  msg.textContent =
+    "Welcome back — you've answered " + n + ' of ' + total + '. Picking up where you left off.';
+  box.appendChild(msg);
+
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'welcome-back__dismiss';
+  dismiss.setAttribute('aria-label', 'Dismiss welcome-back message');
+  dismiss.textContent = 'Dismiss';
+  dismiss.addEventListener('click', () => {
+    host.textContent = '';
+  });
+  box.appendChild(dismiss);
+
+  host.appendChild(box);
 }
 
 // Re-render only the sections that derive from the mutable answers/overrides:
@@ -116,10 +208,26 @@ function handleClear() {
 export function renderAll(draft) {
   currentDraft = draft || createEmptyDraft();
 
+  const reckonerEl = el('reckoner');
+  if (reckonerEl) {
+    safeRender('reckoner', function () {
+      renderReckoner(reckonerEl, currentDraft, handleBand);
+    });
+  }
+  updateHeroFigure(currentDraft);
+
   const checklistEl = el('checklist');
   if (checklistEl) {
     safeRender('checklist', function () {
       renderChecklist(checklistEl, currentDraft, handleChange);
+    });
+  }
+  updateChecklistTab(currentDraft);
+
+  const saveControlEl = el('save-control');
+  if (saveControlEl) {
+    safeRender('save-control', function () {
+      renderSaveControl(saveControlEl);
     });
   }
 
@@ -137,13 +245,25 @@ function boot() {
   // store.load() returns a fresh empty draft on missing/corrupt/unrecognized
   // schema and respects the persistence gate, so this is always a valid draft.
   currentDraft = loadDraft();
+
+  // rewardEstimate is derived and deliberately nulled by normalizeDraft; recompute
+  // it from the persisted band id before first paint so the hero personalises.
+  if (currentDraft.reckoner) {
+    currentDraft.reckoner.rewardEstimate = estimateForBand(
+      currentDraft.reckoner.recoverableInput
+    );
+  }
+
   renderAll(currentDraft);
+  maybeGreetReturn(currentDraft);
 
   // Any section that mutates the draft (checklist, draft edits, and the
   // standalone reckoner) dispatches 'draft:changed' on document. Re-render the
-  // dependent sections only, so we never clobber active tap/focus state.
+  // dependent sections only, so we never clobber active tap/focus state, and
+  // keep the checklist tab progress badge in sync.
   document.addEventListener('draft:changed', function () {
     renderDependent();
+    updateChecklistTab(currentDraft);
   });
 }
 

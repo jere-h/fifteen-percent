@@ -15,7 +15,7 @@
 // This is manual copy-paste only. Nothing here ever contacts or auto-submits
 // to IRAS.
 
-import { transferMap } from './data.js';
+import { transferMap, money, evidenceAttachments } from './data.js';
 import { writeText } from './clipboard.js';
 import { buildNarrative } from './draft.js';
 
@@ -27,7 +27,7 @@ let toastTimer = null;
 
 function formatMoney(n) {
   if (typeof n !== 'number' || !isFinite(n)) return '';
-  return 'S$' + Math.round(n).toLocaleString('en-SG');
+  return money.format(n);
 }
 
 function formatAnswer(val, formatter) {
@@ -138,6 +138,19 @@ function showToast(root, ok) {
   );
 }
 
+// Neutral, honest state for a copy request with nothing to copy — never claims
+// "Copied" when the clipboard was untouched (TRD-16).
+function showNeutralToast(root, message) {
+  const toast = root.querySelector('.toast');
+  if (!toast) return;
+  toast.classList.remove('toast--copied', 'toast--failed');
+  toast.textContent = message;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.textContent = '';
+  }, 2400);
+}
+
 // Reveal a selectable, read-only text block so the user can highlight + copy
 // by hand when the clipboard API is unavailable. Built on demand (never
 // shipped hidden at rest) and cleared on the next render.
@@ -166,6 +179,13 @@ function revealSelectable(hostEl, text) {
 // ---------------------------------------------------------------------------
 
 async function doCopy(root, hostEl, text) {
+  // Nothing to copy: never send an empty payload to the clipboard (which would
+  // resolve true and falsely toast "Copied"). Give a neutral response (TRD-16).
+  if (text == null || String(text).trim() === '') {
+    showNeutralToast(root, 'Nothing to copy yet');
+    return;
+  }
+
   // Paint the pending state synchronously, inside the click's own turn, so the
   // confirmation UI is visible immediately rather than after the async call.
   pendingToast(root);
@@ -186,6 +206,82 @@ async function doCopy(root, hostEl, text) {
 // Render
 // ---------------------------------------------------------------------------
 
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function goToChecklist() {
+  const tab = document.getElementById('tab-checklist');
+  if (tab) tab.click();
+}
+
+// Build the closing "you're ready — paste and attach these files" block (TRD-17).
+// Read-only, derived from answers; no upload or submit affordance.
+function buildReadyBlock(draft, readyCount, total) {
+  const section = el('section', 'transfer__ready');
+
+  const done = readyCount === total;
+  const cue = el('p', 'transfer__ready-cue');
+  cue.setAttribute('role', 'status');
+  cue.textContent = done
+    ? "You're ready. Every field above is filled — here is how to hand it over."
+    : "Almost there. You can hand over what you have now, or finish the checklist first.";
+  section.appendChild(cue);
+
+  // Personalised reward phrase from the single money source.
+  const est = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
+  const reward = el('p', 'transfer__ready-reward');
+  reward.textContent =
+    typeof est === 'number' && isFinite(est) && est > 0
+      ? 'If IRAS recovers tax from this, the reward is ' + money.phrase(est) + '.'
+      : 'If IRAS recovers tax from this, the reward is ' +
+        money.ceilingPhrase +
+        ', ' +
+        money.caveat +
+        '.';
+  section.appendChild(reward);
+
+  section.appendChild(el('p', 'transfer__ready-title', 'Next, on your own:'));
+  const steps = el('ol', 'transfer__ready-steps');
+  steps.appendChild(
+    el('li', null, 'Open the official IRAS informant form in your own browser.')
+  );
+  steps.appendChild(
+    el('li', null, 'Paste each field above into its matching form field.')
+  );
+  section.appendChild(steps);
+
+  // Attachment checklist derived from the evidence answer.
+  const evidence = draft && draft.answers ? draft.answers.evidenceInHand : null;
+  if (Array.isArray(evidence) && evidence.length) {
+    const attachable = [];
+    const notes = [];
+    evidence.forEach((item) => {
+      const map = evidenceAttachments[item];
+      if (map && map.attach) attachable.push(map.text);
+      else if (map) notes.push(map.text);
+      else attachable.push(String(item).toLowerCase());
+    });
+
+    if (attachable.length) {
+      section.appendChild(
+        el('p', 'transfer__ready-title', 'Bring these files to attach:')
+      );
+      const ul = el('ul', 'transfer__attach');
+      attachable.forEach((t) => ul.appendChild(el('li', null, t)));
+      section.appendChild(ul);
+    }
+    notes.forEach((n) => {
+      section.appendChild(el('p', 'transfer__attach-note', n));
+    });
+  }
+
+  return section;
+}
+
 export function renderTransfer(rootEl, draft) {
   if (!rootEl) return;
   rootEl.innerHTML = '';
@@ -193,50 +289,54 @@ export function renderTransfer(rootEl, draft) {
   const wrap = document.createElement('div');
   wrap.className = 'transfer';
 
-  const eyebrow = document.createElement('p');
-  eyebrow.className = 'eyebrow';
-  eyebrow.textContent = 'Transfer mode';
-  wrap.appendChild(eyebrow);
-
-  const heading = document.createElement('h2');
-  heading.textContent = 'Copy into the IRAS form yourself';
-  wrap.appendChild(heading);
-
-  const intro = document.createElement('p');
-  intro.textContent =
-    'Each row below matches one field on the IRAS informant form. Copy the value across yourself when you are ready. This tool never sends anything to IRAS and never submits on your behalf.';
-  wrap.appendChild(intro);
+  // Header kept together, full-width above the field grid (TRD-14).
+  const header = el('header', 'transfer__header');
+  header.appendChild(el('p', 'eyebrow', 'Transfer mode'));
+  const heading = el('h2', null, 'Copy into the IRAS form yourself');
+  heading.id = 'transfer-heading';
+  heading.tabIndex = -1; // TRD-8 focus target on view switch
+  header.appendChild(heading);
+  header.appendChild(
+    el(
+      'p',
+      null,
+      'Each row below matches one field on the IRAS informant form. Copy the value across yourself when you are ready. This tool never sends anything to IRAS and never submits on your behalf.'
+    )
+  );
+  wrap.appendChild(header);
 
   const fields = (transferMap && transferMap.fields) || [];
+  const total = fields.length;
+  let readyCount = 0;
+
+  // Recognition line — count of ready fields with a path back (TRD-15).
+  const recognition = el('p', 'transfer__recognition');
+  recognition.setAttribute('role', 'status');
+  wrap.appendChild(recognition);
 
   const list = document.createElement('div');
   list.className = 'transfer__fields';
 
+  const emptyFields = [];
+
   fields.forEach((field) => {
     const value = resolveValue(draft, field);
 
-    const row = document.createElement('div');
-    row.className = 'transfer__field';
-
-    const label = document.createElement('div');
-    label.className = 'transfer__label';
-    label.textContent = field.irasLabel;
-    row.appendChild(label);
-
-    const valueEl = document.createElement('div');
-    valueEl.className = 'transfer__value';
-    if (value) {
-      valueEl.textContent = value;
-    } else {
-      valueEl.textContent = 'Not provided yet';
-      valueEl.setAttribute('data-empty', 'true');
+    if (!value) {
+      emptyFields.push(field);
+      return; // de-emphasised empties are collected below, not shown as a wall
     }
+
+    readyCount += 1;
+
+    const row = el('div', 'transfer__field');
+    row.appendChild(el('div', 'transfer__label', field.irasLabel));
+
+    const valueEl = el('div', 'transfer__value', value);
     row.appendChild(valueEl);
 
-    const copyBtn = document.createElement('button');
+    const copyBtn = el('button', 'transfer__copy', 'Copy');
     copyBtn.type = 'button';
-    copyBtn.className = 'transfer__copy';
-    copyBtn.textContent = 'Copy';
     copyBtn.setAttribute('aria-label', 'Copy the value for ' + field.irasLabel);
     copyBtn.addEventListener('click', () => {
       doCopy(wrap, row, value);
@@ -248,29 +348,73 @@ export function renderTransfer(rootEl, draft) {
 
   wrap.appendChild(list);
 
-  // Whole-report fallback.
-  const copyAll = document.createElement('button');
+  recognition.textContent = '';
+  recognition.appendChild(
+    document.createTextNode(readyCount + ' of ' + total + ' ready. ')
+  );
+  if (readyCount < total) {
+    const back = el('button', 'transfer__recognition-link', 'Finish the checklist');
+    back.type = 'button';
+    back.addEventListener('click', goToChecklist);
+    recognition.appendChild(back);
+    recognition.appendChild(
+      document.createTextNode(' to fill the rest.')
+    );
+  } else {
+    recognition.appendChild(
+      document.createTextNode('Everything is filled in.')
+    );
+  }
+
+  // Collapsed disclosure of the not-yet-filled fields, de-emphasised rather
+  // than an equal wall of "Not provided yet" (TRD-15/16).
+  if (emptyFields.length) {
+    const details = document.createElement('details');
+    details.className = 'transfer__empty-wrap';
+    const summary = document.createElement('summary');
+    summary.className = 'transfer__empty-summary';
+    summary.textContent = 'Not yet filled (' + emptyFields.length + ')';
+    details.appendChild(summary);
+    emptyFields.forEach((field) => {
+      const row = el('div', 'transfer__field transfer__field--empty');
+      row.appendChild(el('div', 'transfer__label', field.irasLabel));
+      const v = el('div', 'transfer__value', 'Not provided yet');
+      v.setAttribute('data-empty', 'true');
+      row.appendChild(v);
+      details.appendChild(row);
+    });
+    wrap.appendChild(details);
+  }
+
+  // Whole-report fallback (only useful once something is filled).
+  const copyAll = el('button', 'transfer__copy-all', 'Copy all as text');
   copyAll.type = 'button';
-  copyAll.className = 'transfer__copy-all';
-  copyAll.textContent = 'Copy all as text';
   copyAll.addEventListener('click', () => {
     doCopy(wrap, wrap, buildAllText(draft));
   });
   wrap.appendChild(copyAll);
 
+  // Closing recognition + attachment guidance (TRD-17).
+  wrap.appendChild(buildReadyBlock(draft, readyCount, total));
+
   // Live status toast (empty at rest, so no hidden text ships).
-  const toast = document.createElement('div');
-  toast.className = 'toast';
+  const toast = el('div', 'toast');
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
   wrap.appendChild(toast);
 
   // Provenance marker for the field mapping.
-  const verified = document.createElement('p');
-  verified.className = 'transfer__verified';
-  const when = transferMap && transferMap.lastVerified ? transferMap.lastVerified : 'an unrecorded date';
-  verified.textContent = 'Field mapping last verified on ' + when + '. Manual copy-paste only.';
-  wrap.appendChild(verified);
+  const when =
+    transferMap && transferMap.lastVerified
+      ? transferMap.lastVerified
+      : 'an unrecorded date';
+  wrap.appendChild(
+    el(
+      'p',
+      'transfer__verified',
+      'Field mapping last verified on ' + when + '. Manual copy-paste only.'
+    )
+  );
 
   rootEl.appendChild(wrap);
 }
