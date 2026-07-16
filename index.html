@@ -1,0 +1,72 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fifteen Percent: prepare an IRAS report, privately</title>
+<meta name="description" content="A calm, offline-capable tool to help you turn what you've seen into a clear, copy-ready tax-evasion report to IRAS. Nothing is sent anywhere; everything stays on your device.">
+<link rel="stylesheet" href="styles.css">
+
+<div id="app">
+
+  <header class="banner" role="banner">
+    <p class="banner__mark">Independent tool. Not affiliated with, endorsed by, or operated by IRAS or any government body. Nothing you type is submitted or transmitted anywhere.</p>
+    <p class="banner__verified">Reference figures last verified on 16 July 2026.</p>
+  </header>
+
+  <section id="safety" class="section" aria-label="Safety and privacy"></section>
+
+  <main>
+
+    <section class="section" aria-labelledby="cases-heading">
+      <p class="eyebrow">Real convictions</p>
+      <h2 id="cases-heading">What a substantiated case can look like</h2>
+      <p>These are published IRAS convictions, kept as reference so you can gauge whether what you've seen resembles a real offence. Figures are drawn from official media releases.</p>
+      <div id="cases-list" class="section"></div>
+    </section>
+
+    <section id="reckoner" class="section" aria-labelledby="reckoner-heading">
+      <p class="eyebrow">Reward reckoner</p>
+      <h2 id="reckoner-heading">A rough sense of the reward</h2>
+      <p>IRAS may pay an informant a discretionary reward of up to 15% of the tax recovered, capped at S$100,000. Enter a rough figure to see an illustrative estimate.</p>
+
+      <div class="reckoner__control">
+        <label class="reckoner__label" for="reckoner-input">Estimated tax likely recoverable (S$)</label>
+        <input
+          id="reckoner-input"
+          class="reckoner__input"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="e.g. 40,000">
+        <button type="button" class="reckoner__button">Compute reward estimate</button>
+      </div>
+
+      <p class="reckoner__error" role="alert" hidden></p>
+
+      <div class="reckoner__result">
+        <output class="reckoner__figure" aria-live="polite" hidden></output>
+        <span class="reckoner__disclaimer">discretionary estimate, not a promise</span>
+      </div>
+    </section>
+
+    <section id="checklist" class="section" aria-labelledby="checklist-heading">
+      <p class="eyebrow">Guided checklist</p>
+      <h2 id="checklist-heading">Build your report, one tap at a time</h2>
+    </section>
+
+    <section id="draft" class="section" aria-labelledby="draft-heading">
+      <p class="eyebrow">Assembled draft</p>
+      <h2 id="draft-heading">Your report, in plain language</h2>
+    </section>
+
+    <section id="transfer" class="section" aria-labelledby="transfer-heading">
+      <p class="eyebrow">Transfer mode</p>
+      <h2 id="transfer-heading">Copy across to the IRAS form yourself</h2>
+      <p>Nothing here is sent for you. Copy each piece into the official IRAS reporting form in your own browser when you're ready.</p>
+    </section>
+
+  </main>
+
+</div>
+
+<script type="module" src="js/reckoner.js"></script>
+<script type="module" src="js/app.js"></script>
