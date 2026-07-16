@@ -12,57 +12,89 @@
     <p class="banner__verified">Reference figures last verified on 16 July 2026.</p>
   </header>
 
-  <section id="safety" class="section" aria-label="Safety and privacy"></section>
+  <details id="safety-wrap" class="safety-wrap">
+    <summary class="safety-wrap__summary">Your safety &amp; privacy on this page</summary>
+    <section id="safety" class="section" aria-label="Safety and privacy"></section>
+  </details>
+
+  <nav class="stepnav" aria-label="Sections">
+    <button type="button" class="stepnav__tab" role="tab" id="tab-hook" aria-controls="view-hook" aria-selected="true" data-view="hook">
+      <span class="stepnav__index">1</span> The hook
+    </button>
+    <button type="button" class="stepnav__tab" role="tab" id="tab-checklist" aria-controls="view-checklist" aria-selected="false" data-view="checklist">
+      <span class="stepnav__index">2</span> Checklist
+    </button>
+    <button type="button" class="stepnav__tab" role="tab" id="tab-draft" aria-controls="view-draft" aria-selected="false" data-view="draft">
+      <span class="stepnav__index">3</span> Assembly
+    </button>
+    <button type="button" class="stepnav__tab" role="tab" id="tab-transfer" aria-controls="view-transfer" aria-selected="false" data-view="transfer">
+      <span class="stepnav__index">4</span> Transfer
+    </button>
+  </nav>
 
   <main>
 
-    <section class="section" aria-labelledby="cases-heading">
-      <p class="eyebrow">Real convictions</p>
-      <h2 id="cases-heading">What a substantiated case can look like</h2>
-      <p>These are published IRAS convictions, kept as reference so you can gauge whether what you've seen resembles a real offence. Figures are drawn from official media releases.</p>
-      <div id="cases-list" class="section"></div>
-    </section>
+    <div id="view-hook" class="view" role="tabpanel" aria-labelledby="tab-hook">
+      <section class="section" aria-labelledby="cases-heading">
+        <p class="eyebrow">Real convictions</p>
+        <h2 id="cases-heading">What a substantiated case can look like</h2>
+        <p>These are published IRAS convictions, kept as reference so you can gauge whether what you've seen resembles a real offence. Figures are drawn from official media releases.</p>
+        <div id="cases-list" class="section"></div>
+      </section>
 
-    <section id="reckoner" class="section" aria-labelledby="reckoner-heading">
-      <p class="eyebrow">Reward reckoner</p>
-      <h2 id="reckoner-heading">A rough sense of the reward</h2>
-      <p>IRAS may pay an informant a discretionary reward of up to 15% of the tax recovered, capped at S$100,000. Enter a rough figure to see an illustrative estimate.</p>
+      <section id="reckoner" class="section" aria-labelledby="reckoner-heading">
+        <p class="eyebrow">Reward reckoner</p>
+        <h2 id="reckoner-heading">A rough sense of the reward</h2>
+        <p>IRAS may pay an informant a discretionary reward of up to 15% of the tax recovered, capped at S$100,000. Enter a rough figure to see an illustrative estimate.</p>
 
-      <div class="reckoner__control">
-        <label class="reckoner__label" for="reckoner-input">Estimated tax likely recoverable (S$)</label>
-        <input
-          id="reckoner-input"
-          class="reckoner__input"
-          type="text"
-          inputmode="decimal"
-          autocomplete="off"
-          placeholder="e.g. 40,000">
-        <button type="button" class="reckoner__button">Compute reward estimate</button>
-      </div>
+        <div class="reckoner__control">
+          <label class="reckoner__label" for="reckoner-input">Estimated tax likely recoverable (S$)</label>
+          <input
+            id="reckoner-input"
+            class="reckoner__input"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="e.g. 40,000">
+          <button type="button" class="reckoner__button">Compute reward estimate</button>
+        </div>
 
-      <p class="reckoner__error" role="alert" hidden></p>
+        <p class="reckoner__error" role="alert" hidden></p>
 
-      <div class="reckoner__result">
-        <output class="reckoner__figure" aria-live="polite" hidden></output>
-        <span class="reckoner__disclaimer">discretionary estimate, not a promise</span>
-      </div>
-    </section>
+        <div class="reckoner__result">
+          <output class="reckoner__figure" aria-live="polite" hidden></output>
+          <span class="reckoner__disclaimer">discretionary estimate, not a promise</span>
+        </div>
+      </section>
 
-    <section id="checklist" class="section" aria-labelledby="checklist-heading">
-      <p class="eyebrow">Guided checklist</p>
-      <h2 id="checklist-heading">Build your report, one tap at a time</h2>
-    </section>
+      <button type="button" class="view__next" data-next="checklist">Start the checklist →</button>
+    </div>
 
-    <section id="draft" class="section" aria-labelledby="draft-heading">
-      <p class="eyebrow">Assembled draft</p>
-      <h2 id="draft-heading">Your report, in plain language</h2>
-    </section>
+    <div id="view-checklist" class="view" role="tabpanel" aria-labelledby="tab-checklist" hidden>
+      <section id="checklist" class="section" aria-labelledby="checklist-heading">
+        <p class="eyebrow">Guided checklist</p>
+        <h2 id="checklist-heading">Build your report, one tap at a time</h2>
+      </section>
 
-    <section id="transfer" class="section" aria-labelledby="transfer-heading">
-      <p class="eyebrow">Transfer mode</p>
-      <h2 id="transfer-heading">Copy across to the IRAS form yourself</h2>
-      <p>Nothing here is sent for you. Copy each piece into the official IRAS reporting form in your own browser when you're ready.</p>
-    </section>
+      <button type="button" class="view__next" data-next="draft">See your draft →</button>
+    </div>
+
+    <div id="view-draft" class="view" role="tabpanel" aria-labelledby="tab-draft" hidden>
+      <section id="draft" class="section" aria-labelledby="draft-heading">
+        <p class="eyebrow">Assembled draft</p>
+        <h2 id="draft-heading">Your report, in plain language</h2>
+      </section>
+
+      <button type="button" class="view__next" data-next="transfer">Go to Transfer Mode →</button>
+    </div>
+
+    <div id="view-transfer" class="view" role="tabpanel" aria-labelledby="tab-transfer" hidden>
+      <section id="transfer" class="section" aria-labelledby="transfer-heading">
+        <p class="eyebrow">Transfer mode</p>
+        <h2 id="transfer-heading">Copy across to the IRAS form yourself</h2>
+        <p>Nothing here is sent for you. Copy each piece into the official IRAS reporting form in your own browser when you're ready.</p>
+      </section>
+    </div>
 
   </main>
 
@@ -70,3 +102,4 @@
 
 <script type="module" src="js/reckoner.js"></script>
 <script type="module" src="js/app.js"></script>
+<script type="module" src="js/nav.js"></script>
