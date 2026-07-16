@@ -118,7 +118,6 @@ textarea {
 }
 
 /* Long strings / URLs never force horizontal scroll */
-.case-card__citation,
 .transfer__value,
 .draft__paragraph,
 .safety__caveat {
@@ -306,13 +305,6 @@ p {
   margin: 0 0 var(--space-3);
 }
 
-/* Monospace numeric/tabular figures */
-.reckoner__figure,
-.case-card__figure {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
 /* --------------------------------------------------------------- Banner */
 .banner {
   display: flex;
@@ -338,6 +330,23 @@ p {
   letter-spacing: .04em;
   color: var(--color-muted);
   margin-left: auto;
+}
+
+/* ----------------------------------------------------------- Reward line */
+/* Thin, persistent, no-frills statement of the headline fact. Always shown,
+   regardless of which view is active. */
+.reward-line {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: .95rem;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.reward-line__figure {
+  font-size: 1.3em;
+  font-weight: 700;
+  color: var(--color-accent);
 }
 
 /* ---------------------------------------------------------------- Safety */
@@ -438,154 +447,6 @@ p {
 
 .safety__clear:active {
   transform: translateY(1px);
-}
-
-/* -------------------------------------------------------------- Reckoner */
-.reckoner {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-md);
-}
-
-.reckoner label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: var(--space-2);
-}
-
-.reckoner__input {
-  width: 100%;
-  min-height: 44px;
-  padding: var(--space-3) var(--space-4);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  margin-bottom: var(--space-3);
-  transition: border-color .2s var(--ease-soft), box-shadow .2s var(--ease-soft);
-}
-
-.reckoner__input:focus-visible {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(232, 85, 127, .18);
-  outline: none;
-}
-
-.reckoner__button {
-  min-height: 44px;
-  padding: var(--space-3) var(--space-5);
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter .2s var(--ease-soft), transform .12s var(--ease-soft);
-}
-
-.reckoner__button:hover,
-.reckoner__button:focus-visible {
-  filter: brightness(1.06);
-}
-
-.reckoner__button:active {
-  transform: translateY(1px);
-}
-
-.reckoner__figure {
-  font-size: clamp(1.6rem, 6vw, 2.2rem);
-  font-weight: 650;
-  margin-top: var(--space-4);
-  color: var(--color-fg);
-}
-
-.reckoner__figure:empty {
-  display: none;
-}
-
-.reckoner__disclaimer {
-  display: inline-block;
-  margin-top: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  font-family: var(--font-mono);
-  font-size: .875rem;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-  background: var(--color-sand);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-}
-
-.reckoner__error {
-  margin-top: var(--space-3);
-  color: var(--color-accent);
-  font-size: .95rem;
-  font-weight: 500;
-}
-
-.reckoner__error:empty {
-  display: none;
-}
-
-/* ------------------------------------------------------------ Case cards */
-#cases-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.case-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-sm);
-  transition: transform .3s var(--ease-soft), box-shadow .3s var(--ease-soft);
-}
-
-.case-card:hover {
-  box-shadow: var(--shadow-lg);
-}
-
-.case-card__offence {
-  font-weight: 600;
-  font-size: 1.05rem;
-  margin-bottom: var(--space-3);
-}
-
-.case-card__figure {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-top: 1px dashed var(--color-border);
-  font-size: .95rem;
-}
-
-.case-card__figure span:last-child {
-  font-weight: 600;
-  color: var(--color-fg);
-}
-
-.case-card__citation {
-  display: inline-block;
-  margin-top: var(--space-3);
-  font-size: .9rem;
-}
-
-.case-card__verified {
-  display: block;
-  margin-top: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: .875rem;
-  letter-spacing: .04em;
-  color: var(--color-muted);
 }
 
 /* -------------------------------------------------------------- Checklist */
@@ -936,12 +797,6 @@ p {
 @media (min-width: 720px) {
   #app {
     padding: var(--space-6) var(--space-6) var(--space-7);
-  }
-
-  #cases-list {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-5);
   }
 
   .checklist {

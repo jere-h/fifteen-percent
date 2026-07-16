@@ -5,7 +5,7 @@
 // aria-selected on the matching .stepnav__tab. Does not touch any section's
 // rendered content, so app.js/reckoner.js/checklist.js etc. are untouched.
 
-const VIEWS = ['hook', 'checklist', 'draft', 'transfer'];
+const VIEWS = ['checklist', 'draft', 'transfer'];
 
 function showView(name) {
   if (!VIEWS.includes(name)) return;
@@ -32,7 +32,7 @@ function boot() {
     btn.addEventListener('click', () => showView(btn.dataset.next));
   });
 
-  showView('hook');
+  showView('checklist');
 }
 
 if (document.readyState === 'loading') {

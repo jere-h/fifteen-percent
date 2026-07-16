@@ -1,9 +1,9 @@
-// app.js — Entry orchestrator for the non-reckoner sections of "Fifteen Percent".
+// app.js — Entry orchestrator for "Fifteen Percent".
 //
 // Responsibilities (see the shared contract):
 //   - Load the single in-memory reportDraft via store.load() (which itself
 //     respects the persistence toggle, default on).
-//   - Render the cases, checklist, draft, transfer and safety sections.
+//   - Render the checklist, draft, transfer and safety sections.
 //   - Own the single in-memory source of truth and persist mutations through
 //     store.save (a no-op only while the reader has explicitly turned
 //     persistence off).
@@ -12,14 +12,9 @@
 //     preserved.
 //   - Expose renderAll(draft), used by the Safety panel's Clear to return the
 //     whole page to its empty state.
-//
-// Deliberately imports NOTHING from reckoner.js. reckoner.js is loaded by
-// index.html as its own standalone module and keeps its own draft instance, so
-// any fault in this orchestrator cannot break the standalone MVP reckoner.
 
 import { createEmptyDraft } from './state.js';
 import { load as loadDraft, save as saveDraft, clear as clearDraft } from './store.js';
-import { renderCases } from './cases.js';
 import { renderChecklist } from './checklist.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
@@ -120,13 +115,6 @@ function handleClear() {
 // Clear flow.
 export function renderAll(draft) {
   currentDraft = draft || createEmptyDraft();
-
-  const casesEl = el('cases-list');
-  if (casesEl) {
-    safeRender('cases', function () {
-      renderCases(casesEl);
-    });
-  }
 
   const checklistEl = el('checklist');
   if (checklistEl) {
