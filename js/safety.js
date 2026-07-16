@@ -34,6 +34,21 @@ function el(tag, className, text) {
   return node;
 }
 
+// Keep every persistence toggle on the page (the surfaced control near the flow
+// and the one inside the Safety panel) reflecting the single stored flag. One
+// source of truth, no second storage key.
+let syncBound = false;
+function bindPersistenceSync() {
+  if (syncBound) return;
+  syncBound = true;
+  document.addEventListener('persistence:changed', () => {
+    const on = isPersistenceEnabled();
+    document.querySelectorAll('.js-persistence-toggle').forEach((box) => {
+      if (box.checked !== on) box.checked = on;
+    });
+  });
+}
+
 /**
  * Render the Safety panel into rootEl (#safety).
  * @param {HTMLElement} rootEl
@@ -64,9 +79,11 @@ export function renderSafety(rootEl, onClear) {
   // --- Persistence toggle (default on — autosave) -------------------------
   const toggle = el('label', 'safety__toggle');
 
+  bindPersistenceSync();
+
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.className = 'safety__toggle-input';
+  checkbox.className = 'safety__toggle-input js-persistence-toggle';
   const canStore = storageAvailable();
   checkbox.checked = canStore && isPersistenceEnabled();
   if (!canStore) checkbox.disabled = true;
@@ -83,6 +100,7 @@ export function renderSafety(rootEl, onClear) {
 
   checkbox.addEventListener('change', () => {
     setPersistenceEnabled(checkbox.checked);
+    document.dispatchEvent(new CustomEvent('persistence:changed'));
   });
 
   panel.appendChild(toggle);
@@ -107,4 +125,55 @@ export function renderSafety(rootEl, onClear) {
   panel.appendChild(clearWrap);
 
   rootEl.appendChild(panel);
+}
+
+/**
+ * Render a compact, always-visible "save on this device only" control near the
+ * flow (TRD-20) — the product's answer to IRAS's unsaveable 15-minute session.
+ * Strictly gated on the same store.js flag as the Safety panel toggle; no
+ * second storage key; nothing is transmitted.
+ * @param {HTMLElement} rootEl
+ */
+export function renderSaveControl(rootEl) {
+  if (!rootEl) return;
+  bindPersistenceSync();
+  rootEl.textContent = '';
+
+  const canStore = storageAvailable();
+
+  const toggle = el('label', 'save-control');
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'save-control__input js-persistence-toggle';
+  checkbox.checked = canStore && isPersistenceEnabled();
+  if (!canStore) checkbox.disabled = true;
+
+  const text = el('span', 'save-control__text');
+  text.appendChild(
+    el(
+      'span',
+      'save-control__title',
+      'Save my progress on this device only — nothing is sent'
+    )
+  );
+  text.appendChild(
+    el(
+      'span',
+      'save-control__help',
+      canStore
+        ? 'So you can close this and come back to where you left off. Stored only in this browser; anyone using this device could find it. Turn off any time to keep this session in memory only.'
+        : 'Storage is unavailable in this browser (private mode or full), so your work stays in memory only and will not survive a reload.'
+    )
+  );
+
+  toggle.appendChild(checkbox);
+  toggle.appendChild(text);
+
+  checkbox.addEventListener('change', () => {
+    setPersistenceEnabled(checkbox.checked);
+    document.dispatchEvent(new CustomEvent('persistence:changed'));
+  });
+
+  rootEl.appendChild(toggle);
 }

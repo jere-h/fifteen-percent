@@ -12,14 +12,31 @@
     <p class="banner__verified">Reference figures last verified on 16 July 2026.</p>
   </header>
 
-  <p class="reward-line">IRAS can pay up to <span class="reward-line__figure">15%</span> of tax recovered, up to $100,000.</p>
+  <header class="hero">
+    <h1 class="hero__headline">
+      You could be paid
+      <span class="hero__figure" id="hero-figure">up to ~S$100,000</span>
+      for reporting tax evasion to IRAS — a reward of
+      <span class="hero__rate">15%</span>
+      of the tax they recover.
+    </h1>
+    <p class="hero__subhead">
+      Few people know this, and the official form can't be saved once you start. This private tool lets you prepare your report at your own pace, then copy it across yourself. It is a discretionary reward, never a promise.
+    </p>
+
+    <section id="reckoner" class="reckoner" aria-label="Estimate your possible reward"></section>
+  </header>
+
+  <div id="save-control" class="save-control-wrap"></div>
+
+  <div id="welcome-back" aria-live="polite"></div>
 
   <details id="safety-wrap" class="safety-wrap">
-    <summary class="safety-wrap__summary">Your safety &amp; privacy on this page</summary>
+    <summary class="safety-wrap__summary">Private: everything stays in this browser — nothing is sent. Read how &amp; manage your data</summary>
     <section id="safety" class="section" aria-label="Safety and privacy"></section>
   </details>
 
-  <nav class="stepnav" aria-label="Sections">
+  <nav class="stepnav" role="tablist" aria-label="Report sections">
     <button type="button" class="stepnav__tab" role="tab" id="tab-checklist" aria-controls="view-checklist" aria-selected="true" data-view="checklist">
       <span class="stepnav__index">1</span> Checklist
     </button>
@@ -34,32 +51,24 @@
   <main>
 
     <div id="view-checklist" class="view" role="tabpanel" aria-labelledby="tab-checklist">
-      <section id="checklist" class="section" aria-labelledby="checklist-heading">
-        <p class="eyebrow">Guided checklist</p>
-        <h2 id="checklist-heading">Build your report, one tap at a time</h2>
-      </section>
+      <section id="checklist" class="section" aria-labelledby="checklist-heading"></section>
 
       <button type="button" class="view__next" data-next="draft">See your draft →</button>
     </div>
 
     <div id="view-draft" class="view" role="tabpanel" aria-labelledby="tab-draft" hidden>
-      <section id="draft" class="section" aria-labelledby="draft-heading">
-        <p class="eyebrow">Assembled draft</p>
-        <h2 id="draft-heading">Your report, in plain language</h2>
-      </section>
+      <section id="draft" class="section" aria-labelledby="draft-heading"></section>
 
       <button type="button" class="view__next" data-next="transfer">Go to Transfer Mode →</button>
     </div>
 
     <div id="view-transfer" class="view" role="tabpanel" aria-labelledby="tab-transfer" hidden>
-      <section id="transfer" class="section" aria-labelledby="transfer-heading">
-        <p class="eyebrow">Transfer mode</p>
-        <h2 id="transfer-heading">Copy across to the IRAS form yourself</h2>
-        <p>Nothing here is sent for you. Copy each piece into the official IRAS reporting form in your own browser when you're ready.</p>
-      </section>
+      <section id="transfer" class="section" aria-labelledby="transfer-heading"></section>
     </div>
 
   </main>
+
+  <div id="sr-live" class="sr-only" aria-live="polite" role="status"></div>
 
 </div>
 

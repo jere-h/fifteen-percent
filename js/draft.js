@@ -18,6 +18,8 @@
 // draftKeys used for fieldOverrides match the answer field names so transfer.js
 // can prefer the same override values.
 
+import { money, fragmentFor } from './data.js';
+
 // --- field model -----------------------------------------------------------
 // Ordered to mirror the IRAS informant fields; each `key` doubles as the
 // fieldOverrides draftKey shared with Transfer Mode.
@@ -36,9 +38,13 @@ const REWARD_LABEL = 'Indicative discretionary reward';
 
 // --- pure helpers -----------------------------------------------------------
 
-function formatMoney(n) {
-  const rounded = Math.round(Number(n) || 0);
-  return rounded.toLocaleString('en-US');
+// Join fragments into a natural list: "a", "a and b", "a, b and c".
+function joinList(items) {
+  const arr = items.filter((s) => s != null && String(s).trim() !== '');
+  if (arr.length === 0) return '';
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return arr[0] + ' and ' + arr[1];
+  return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
 }
 
 // Resolve every field to a plain string, letting a saved per-field override
@@ -65,7 +71,7 @@ function resolvedValues(draft) {
   if (rewardOv != null && String(rewardOv).trim() !== '') {
     out[REWARD_KEY] = String(rewardOv);
   } else if (typeof est === 'number' && isFinite(est) && est > 0) {
-    out[REWARD_KEY] = 'S$' + formatMoney(est) + ' (discretionary estimate, not a promise)';
+    out[REWARD_KEY] = money.phrase(est);
   } else {
     out[REWARD_KEY] = '';
   }
@@ -83,30 +89,55 @@ function detailRowsWithKeys(draft) {
   return rows;
 }
 
+// Compose the lead paragraph from fluent per-option fragments (TRD-13) rather
+// than splicing raw capitalised button labels. Reads the raw answers directly
+// so each fragment can be looked up; the whole-paragraph hand edit lives in
+// narrativeOverride (handled by buildNarrative).
 function composeParagraph(draft) {
-  const v = resolvedValues(draft);
+  const a = (draft && draft.answers) || {};
   const parts = [];
 
-  if (v.taxType || v.offenceNature) {
+  const taxType = a.taxType;
+  const offence = a.offenceNature;
+  if (taxType || offence) {
     let opening = 'I would like to report a suspected tax offence';
-    if (v.taxType) opening += ' relating to ' + v.taxType;
-    if (v.offenceNature) opening += (v.taxType ? ', ' : ' ') + 'specifically ' + v.offenceNature;
+    if (taxType) opening += ' relating to ' + fragmentFor('taxType', taxType);
+    if (offence) {
+      opening +=
+        (taxType ? ', ' : ' ') +
+        'specifically ' +
+        fragmentFor('offenceNature', offence);
+    }
     parts.push(opening + '.');
   }
-  if (v.taxpayerDetailsKnown) {
-    parts.push('The person or business concerned: ' + v.taxpayerDetailsKnown + '.');
+  if (a.taxpayerDetailsKnown) {
+    parts.push(
+      'About who is involved, I have ' +
+        fragmentFor('taxpayerDetailsKnown', a.taxpayerDetailsKnown) +
+        '.'
+    );
   }
-  if (v.timePeriod) {
-    parts.push('The conduct appears to relate to ' + v.timePeriod + '.');
+  if (a.timePeriod) {
+    parts.push('The conduct ' + fragmentFor('timePeriod', a.timePeriod) + '.');
   }
-  if (v.evidenceInHand) {
-    parts.push('I currently hold the following supporting material: ' + v.evidenceInHand + '.');
+  const evidence = a.evidenceInHand;
+  if (Array.isArray(evidence) && evidence.length) {
+    const frags = evidence.map((e) => fragmentFor('evidenceInHand', e));
+    parts.push('I currently hold ' + joinList(frags) + '.');
   }
-  if (v.relationship) {
-    parts.push('My connection to the matter: ' + v.relationship + '.');
+  if (a.relationship) {
+    parts.push(
+      'I came to know about this ' +
+        fragmentFor('relationship', a.relationship) +
+        '.'
+    );
   }
-  if (v.identifyForReward) {
-    parts.push('On being identified for a possible reward: ' + v.identifyForReward + '.');
+  if (a.identifyForReward) {
+    parts.push(
+      'On a possible reward, ' +
+        fragmentFor('identifyForReward', a.identifyForReward) +
+        '.'
+    );
   }
   return parts.join(' ');
 }
@@ -187,14 +218,53 @@ export function renderDraft(rootEl, draft, onEdit) {
   rootEl.appendChild(eyebrow);
 
   const heading = el('h2', null, 'Your report, in plain words');
+  heading.id = 'draft-heading';
+  heading.tabIndex = -1; // TRD-8 focus target on view switch
   rootEl.appendChild(heading);
 
   if (!hasContent) {
     const empty = el('div', 'draft__empty');
     empty.setAttribute('role', 'status');
     empty.appendChild(el('p', null, 'Start the checklist to build your report'));
+    // Actionable path forward, not a dead end (TRD-18).
+    const cta = el('button', 'draft__empty-cta', 'Start the checklist');
+    cta.type = 'button';
+    cta.addEventListener('click', () => {
+      const tab = document.getElementById('tab-checklist');
+      if (tab) tab.click();
+    });
+    empty.appendChild(cta);
     rootEl.appendChild(empty);
     return;
+  }
+
+  // Framed partial state: recognise progress rather than showing a bare
+  // fragment (TRD-15). answeredCount comes from the seven checklist fields.
+  const total = FIELDS.length;
+  const ready = FIELDS.reduce((acc, f) => {
+    const raw = safe.answers && safe.answers[f.key];
+    const filled = f.list
+      ? Array.isArray(raw) && raw.length > 0
+      : raw != null && String(raw).trim() !== '';
+    return acc + (filled ? 1 : 0);
+  }, 0);
+  if (ready < total) {
+    const partial = el('p', 'draft__recognition');
+    partial.setAttribute('role', 'status');
+    partial.appendChild(
+      document.createTextNode(ready + ' of ' + total + ' answers so far. ')
+    );
+    const back = el('button', 'draft__recognition-link', 'Finish the checklist');
+    back.type = 'button';
+    back.addEventListener('click', () => {
+      const tab = document.getElementById('tab-checklist');
+      if (tab) tab.click();
+    });
+    partial.appendChild(back);
+    partial.appendChild(
+      document.createTextNode(' to fill in the rest — your draft grows as you go.')
+    );
+    rootEl.appendChild(partial);
   }
 
   const note = el(

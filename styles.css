@@ -16,6 +16,13 @@
   /* Accent lock */
   --color-accent: #e8557f;
   --color-on-accent: #ffffff;
+  /* Darker, text-bearing accents so filled surfaces and accent-as-text clear
+     WCAG AA 4.5:1 (TRD-6). --color-accent-strong: white text on this fill is
+     ~5.15:1. --color-link: accent used as text on the page background. The
+     lighter --color-accent is kept only for large/decorative use (hero figure,
+     borders, focus ring, orb gradient). */
+  --color-accent-strong: #b8446a;
+  --color-link: #b8446a;
 
   /* Radius lock */
   --radius: 10px;
@@ -59,6 +66,12 @@
     --color-border: #192a3c;
     --color-sand: #0a1626;
 
+    /* Dark-theme accents (TRD-6): keep the strong fill dark enough for white
+       text (~5.15:1), but let accent-as-text use the light rose, which is
+       high-contrast on the near-black background (~6:1). */
+    --color-accent-strong: #b8446a;
+    --color-link: #e8557f;
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
     --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, .35);
     --shadow-lg: 0 6px 16px -4px rgba(0, 0, 0, .5);
@@ -76,6 +89,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* 1rem = 18px, so the whole sub-1rem type scale re-derives to the 18px
+     accessibility floor (TRD-5) without touching every declaration. */
+  font-size: 112.5%;
 }
 
 body {
@@ -83,7 +99,7 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.6;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
@@ -100,7 +116,7 @@ canvas {
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--color-link);
   text-decoration: none;
 }
 
@@ -162,7 +178,7 @@ textarea {
   align-items: center;
   padding: var(--space-3) var(--space-4);
   font-weight: 600;
-  font-size: .95rem;
+  font-size: 1rem;
 }
 
 .safety-wrap__summary::-webkit-details-marker {
@@ -192,27 +208,33 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
   padding: var(--space-2);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  overflow-x: auto;
 }
 
 .stepnav__tab {
-  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
-  white-space: nowrap;
-  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  text-align: center;
+  white-space: normal;
+  padding: var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-muted);
   font-weight: 600;
-  font-size: .9rem;
+  font-size: 1rem;
+  line-height: 1.2;
   cursor: pointer;
   transition: background .2s var(--ease-soft), color .2s var(--ease-soft);
 }
@@ -223,7 +245,7 @@ textarea {
 }
 
 .stepnav__tab[aria-selected="true"] {
-  background: var(--color-accent);
+  background: var(--color-accent-strong);
   color: var(--color-on-accent);
 }
 
@@ -250,7 +272,7 @@ textarea {
   padding: var(--space-3) var(--space-6);
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--color-accent);
+  background: var(--color-accent-strong);
   color: var(--color-on-accent);
   font-weight: 600;
   cursor: pointer;
@@ -271,7 +293,7 @@ textarea {
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: .12em;
-  font-size: .875rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--color-muted);
   margin: 0 0 var(--space-3);
@@ -306,47 +328,34 @@ p {
 }
 
 /* --------------------------------------------------------------- Banner */
+/* Demoted to a slim, quiet independence strip (TRD-2): always visible, but no
+   longer competing with the hero as the emotional entry point. Kept above the
+   hero in document order; the statement is never hidden behind a disclosure. */
 .banner {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-sand);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .banner__mark {
-  font-weight: 600;
-  font-size: .95rem;
-  color: var(--color-fg);
+  font-weight: 400;
+  font-size: 1rem;
+  color: var(--color-muted);
 }
 
 .banner__verified {
   font-family: var(--font-mono);
-  font-size: .875rem;
+  font-size: 1rem;
   letter-spacing: .04em;
   color: var(--color-muted);
   margin-left: auto;
-}
-
-/* ----------------------------------------------------------- Reward line */
-/* Thin, persistent, no-frills statement of the headline fact. Always shown,
-   regardless of which view is active. */
-.reward-line {
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  font-size: .95rem;
-  color: var(--color-muted);
-  text-align: center;
-}
-
-.reward-line__figure {
-  font-size: 1.3em;
-  font-weight: 700;
-  color: var(--color-accent);
 }
 
 /* ---------------------------------------------------------------- Safety */
@@ -370,7 +379,7 @@ p {
 .safety__caveat {
   position: relative;
   padding-left: var(--space-5);
-  font-size: .95rem;
+  font-size: 1rem;
   color: var(--color-muted);
   line-height: 1.5;
 }
@@ -397,7 +406,7 @@ p {
   border-radius: var(--radius);
   background: var(--color-bg);
   cursor: pointer;
-  font-size: .95rem;
+  font-size: 1rem;
 }
 
 .safety__toggle input[type="checkbox"],
@@ -422,7 +431,7 @@ p {
 }
 
 .safety__toggle-help {
-  font-size: .95rem;
+  font-size: 1rem;
   color: var(--color-muted);
   line-height: 1.5;
 }
@@ -433,7 +442,7 @@ p {
   border: 1px solid var(--color-accent);
   border-radius: var(--radius);
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-link);
   font-weight: 600;
   cursor: pointer;
   transition: background .2s var(--ease-soft), color .2s var(--ease-soft);
@@ -441,7 +450,7 @@ p {
 
 .safety__clear:hover,
 .safety__clear:focus-visible {
-  background: var(--color-accent);
+  background: var(--color-accent-strong);
   color: var(--color-on-accent);
 }
 
@@ -525,8 +534,8 @@ p {
 
 .checklist__chip--selected,
 .checklist__radio--selected {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
   color: var(--color-on-accent);
 }
 
@@ -565,7 +574,7 @@ p {
 .draft__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: .95rem;
+  font-size: 1rem;
 }
 
 .draft__row {
@@ -578,7 +587,7 @@ p {
 
 .draft__row > *:first-child {
   font-family: var(--font-mono);
-  font-size: .875rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: .1em;
   color: var(--color-muted);
@@ -657,7 +666,7 @@ p {
 
 .transfer__label {
   font-family: var(--font-mono);
-  font-size: .875rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: .1em;
   color: var(--color-muted);
@@ -672,7 +681,7 @@ p {
   border-radius: var(--radius-sm);
   padding: var(--space-3);
   margin-bottom: var(--space-3);
-  font-size: .95rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
 
@@ -683,7 +692,7 @@ p {
   border: 1px solid var(--color-accent);
   border-radius: var(--radius);
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-link);
   font-weight: 600;
   cursor: pointer;
   transition: background .2s var(--ease-soft), color .2s var(--ease-soft), transform .12s var(--ease-soft);
@@ -693,7 +702,7 @@ p {
 .transfer__copy:focus-visible,
 .transfer__copy-all:hover,
 .transfer__copy-all:focus-visible {
-  background: var(--color-accent);
+  background: var(--color-accent-strong);
   color: var(--color-on-accent);
 }
 
@@ -705,13 +714,13 @@ p {
 .transfer__copy-all {
   align-self: flex-start;
   padding: var(--space-3) var(--space-5);
-  background: var(--color-accent);
+  background: var(--color-accent-strong);
   color: var(--color-on-accent);
 }
 
 .transfer__verified {
   font-family: var(--font-mono);
-  font-size: .875rem;
+  font-size: 1rem;
   letter-spacing: .04em;
   color: var(--color-muted);
   margin-top: var(--space-2);
@@ -729,7 +738,7 @@ p {
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   font-weight: 600;
-  font-size: .95rem;
+  font-size: 1rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   color: var(--color-fg);
@@ -746,7 +755,7 @@ p {
 
 .toast--copied {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-link);
 }
 
 .toast--failed {
@@ -760,7 +769,7 @@ p {
   margin-top: var(--space-2);
   padding: var(--space-2);
   font-family: var(--font-mono);
-  font-size: .875rem;
+  font-size: 1rem;
   color: var(--color-fg);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -799,27 +808,504 @@ p {
     padding: var(--space-6) var(--space-6) var(--space-7);
   }
 
-  .checklist {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-5);
-    align-items: start;
-  }
-
   .draft__row {
     grid-template-columns: minmax(160px, 1fr) 2fr;
     align-items: baseline;
     gap: var(--space-4);
   }
 
-  .transfer {
+  /* Only the field list is two-column; the header/recognition/ready blocks
+     stay full-width flow above and below it (TRD-14). */
+  .transfer__fields {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-4);
+    align-items: start;
   }
+}
 
-  .transfer__copy-all,
-  .transfer__verified {
-    grid-column: 1 / -1;
+/* ================================================================ TRD additions */
+
+/* Screen-reader-only live region + visually-hidden utility (TRD-8). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- Hero (TRD-1) */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.hero__headline {
+  font-size: clamp(1.5rem, 4.5vw, 2rem);
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.hero__figure {
+  display: inline-block;
+  font-size: clamp(2.4rem, 9vw, 4rem);
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--color-link);
+  letter-spacing: -0.02em;
+}
+
+.hero__rate {
+  font-weight: 700;
+  color: var(--color-link);
+  white-space: nowrap;
+}
+
+.hero__subhead {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+  margin: 0;
+  max-width: 60ch;
+}
+
+/* --------------------------------------------------------------- Reckoner (TRD-4) */
+.reckoner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.reckoner__label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.reckoner__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reckoner__chip {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border-color .2s var(--ease-soft), background .2s var(--ease-soft), color .2s var(--ease-soft);
+}
+
+.reckoner__chip:hover,
+.reckoner__chip:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.reckoner__chip--selected {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.reckoner__estimate {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+/* ------------------------------------------------------- Surfaced save control (TRD-20) */
+.save-control {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.save-control__input {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  accent-color: var(--color-accent-strong);
+  flex: none;
+  cursor: pointer;
+}
+
+.save-control__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.save-control__title {
+  font-weight: 600;
+}
+
+.save-control__help {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+/* --------------------------------------------------------- Welcome-back (TRD-11) */
+.welcome-back {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.welcome-back__text {
+  margin: 0;
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+
+.welcome-back__dismiss {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-weight: 600;
+  cursor: pointer;
+  flex: none;
+}
+
+/* -------------------------------------------------------- Checklist stepper (TRD-10/11/12) */
+.checklist__intro {
+  color: var(--color-muted);
+  max-width: 60ch;
+}
+
+.checklist__progress {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 1rem;
+}
+
+.checklist__progress-count {
+  font-weight: 700;
+  color: var(--color-link);
+}
+
+.checklist--stepped {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.checklist__summaries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.checklist__summaries-title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.checklist__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.checklist__check {
+  flex: none;
+  color: var(--color-link);
+  font-weight: 700;
+}
+
+.checklist__summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.checklist__summary-prompt {
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.checklist__summary-value {
+  font-weight: 600;
+}
+
+.checklist__edit {
+  flex: none;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-link);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checklist__step-counter {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.checklist__hint {
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.checklist__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.checklist__back,
+.checklist__next {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checklist__back {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.checklist__back:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.checklist__next {
+  border: none;
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.checklist__next:hover,
+.checklist__next:focus-visible {
+  filter: brightness(1.06);
+}
+
+/* Multi-select chips: distinct checkbox-style tick, never the solid single-select
+   fill, so pick-one and pick-many read differently (TRD-9). */
+.checklist__chip--multi::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-right: var(--space-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .85em;
+  line-height: 1;
+}
+
+.checklist__chip--multi.checklist__chip--checked {
+  border-color: var(--color-accent-strong);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.checklist__chip--multi.checklist__chip--checked::before {
+  content: "✓";
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+/* ------------------------------------------------------------ Draft states (TRD-15/18) */
+.draft__recognition {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.draft__recognition-link,
+.transfer__recognition-link {
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  border: none;
+  background: transparent;
+  color: var(--color-link);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.draft__empty-cta {
+  display: inline-block;
+  margin-top: var(--space-4);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-6);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------- Transfer additions (TRD-14/15/16/17) */
+.transfer__header {
+  display: flex;
+  flex-direction: column;
+}
+
+.transfer__fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.transfer__recognition {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+.transfer__field--empty {
+  opacity: .7;
+}
+
+.transfer__empty-wrap {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: transparent;
+  padding: var(--space-2) var(--space-4);
+}
+
+.transfer__empty-summary {
+  list-style: none;
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.transfer__empty-summary::-webkit-details-marker {
+  display: none;
+}
+
+.transfer__ready {
+  padding: var(--space-5);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.transfer__ready-cue {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.transfer__ready-reward {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.transfer__ready-title {
+  margin: var(--space-2) 0 0;
+  font-weight: 600;
+}
+
+.transfer__ready-steps,
+.transfer__attach {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.transfer__attach-note {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+/* -------------------------------------------------------- Reduced motion (TRD-21) */
+/* Page-wide guard: nothing animates or auto-scrolls with motion when the reader
+   prefers reduced motion, including the reckoner, stepper, and progress updates. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Two-column transfer field grid on wide viewports (declared last so it wins
+   over the single-column base above) — header stays full-width (TRD-14). */
+@media (min-width: 720px) {
+  .transfer__fields {
+    grid-template-columns: repeat(2, 1fr);
+    align-items: start;
   }
 }

@@ -46,6 +46,35 @@ export const SCHEMA_VERSION = 1;
 //
 // Returns a fresh object graph on every call — no shared references — so
 // callers can mutate the result freely without touching a previous draft.
+// The seven checklist answer fields, in order. Kept beside createEmptyDraft so
+// progress accounting (answeredCount) has one canonical field list.
+export const ANSWER_FIELDS = [
+  'taxType',
+  'offenceNature',
+  'taxpayerDetailsKnown',
+  'timePeriod',
+  'evidenceInHand',
+  'relationship',
+  'identifyForReward',
+];
+
+// Pure: how many of the seven checklist fields are answered. A string answer
+// counts when non-empty; evidenceInHand (an array) counts when it has at least
+// one entry. Derived on demand — never persisted.
+export function answeredCount(draft) {
+  const answers = (draft && draft.answers) || {};
+  let n = 0;
+  for (const field of ANSWER_FIELDS) {
+    const val = answers[field];
+    if (field === 'evidenceInHand') {
+      if (Array.isArray(val) && val.length > 0) n += 1;
+    } else if (val != null && String(val).trim() !== '') {
+      n += 1;
+    }
+  }
+  return n;
+}
+
 export function createEmptyDraft() {
   return {
     schemaVersion: SCHEMA_VERSION,
