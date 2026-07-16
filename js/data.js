@@ -1,10 +1,9 @@
 // js/data.js
-// Fifteen Percent — all three datasets INLINED as ES-module exports.
+// Fifteen Percent — datasets INLINED as ES-module exports.
 // No fetch, no JSON files, no CDN: this file is the single source of truth for
 // the app's bundled content, so the page runs fully offline from a file:// copy.
 //
 // Want your own values? You can edit THIS ONE FILE by hand:
-//   - `cases.items`      -> the conviction gallery shown on first paint
 //   - `checklist.steps`  -> the guided-wizard questions and options
 //   - `transferMap.fields` -> the IRAS-label -> draft-chunk pairings
 // Keep each object's shape (the keys) intact and the rest of the app keeps working.
@@ -12,89 +11,6 @@
 // Every figure below is denominated in Singapore dollars (whole dollars, no cents).
 // The `lastVerified` markers say when a human last checked these facts against the
 // public IRAS record; update them when you re-check.
-
-// ---------------------------------------------------------------------------
-// cases — convictions-only IRAS case records (the pre-populated default gallery)
-// ---------------------------------------------------------------------------
-// Shape (per item):
-//   { id, offenceType, taxEvaded, taxRecovered, rewardDisclosed|null,
-//     citationUrl, citationTitle }
-// `rewardDisclosed` is null wherever the public release did not state a reward
-// figure (IRAS informant rewards are discretionary and are rarely published).
-// These are illustrative example cards drawn from the pattern of IRAS newsroom
-// convictions; treat them as a starting gallery and verify against the live
-// IRAS newsroom before relying on any single figure.
-export const cases = {
-  lastVerified: "2026-07-16",
-  items: [
-    {
-      id: "case-gst-fictitious-2024",
-      offenceType: "GST fraud (fictitious input tax claims)",
-      taxEvaded: 1030000,
-      taxRecovered: 3090000,
-      rewardDisclosed: null,
-      citationUrl:
-        "https://www.iras.gov.sg/news-events/newsroom",
-      citationTitle:
-        "IRAS Newsroom: director jailed for fraudulent GST refund claims",
-    },
-    {
-      id: "case-income-underreport-2023",
-      offenceType: "Income tax evasion (under-declared trade income)",
-      taxEvaded: 267000,
-      taxRecovered: 801000,
-      rewardDisclosed: null,
-      citationUrl:
-        "https://www.iras.gov.sg/news-events/newsroom",
-      citationTitle:
-        "IRAS Newsroom: trader convicted for omitting business income",
-    },
-    {
-      id: "case-missing-trader-2023",
-      offenceType: "Missing-trader GST fraud (carousel scheme)",
-      taxEvaded: 5480000,
-      taxRecovered: 8220000,
-      rewardDisclosed: null,
-      citationUrl:
-        "https://www.iras.gov.sg/news-events/newsroom",
-      citationTitle:
-        "IRAS Newsroom: individuals jailed in missing-trader fraud ring",
-    },
-    {
-      id: "case-property-stamp-2022",
-      offenceType: "Stamp duty evasion (undervalued property transfer)",
-      taxEvaded: 88000,
-      taxRecovered: 352000,
-      rewardDisclosed: null,
-      citationUrl:
-        "https://www.iras.gov.sg/news-events/newsroom",
-      citationTitle:
-        "IRAS Newsroom: penalties for understating property consideration",
-    },
-    {
-      id: "case-fictitious-expenses-2024",
-      offenceType: "Corporate tax evasion (fictitious expense claims)",
-      taxEvaded: 412000,
-      taxRecovered: 1030000,
-      rewardDisclosed: null,
-      citationUrl:
-        "https://www.iras.gov.sg/news-events/newsroom",
-      citationTitle:
-        "IRAS Newsroom: company officer fined for false expense deductions",
-    },
-    {
-      id: "case-cash-sales-2022",
-      offenceType: "Income tax evasion (unrecorded cash sales)",
-      taxEvaded: 154000,
-      taxRecovered: 462000,
-      rewardDisclosed: null,
-      citationUrl:
-        "https://www.iras.gov.sg/news-events/newsroom",
-      citationTitle:
-        "IRAS Newsroom: F&B operator convicted for suppressing cash takings",
-    },
-  ],
-};
 
 // ---------------------------------------------------------------------------
 // checklist — the tap-first guided wizard, mirroring IRAS informant fields
