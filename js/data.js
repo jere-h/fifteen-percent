@@ -52,146 +52,39 @@ export const evidenceAttachments = {
 // 'select' single -> stores the chosen string; 'select' multi -> stores string[].
 // 'verify' -> renders three choices (default "I have this / Not sure / No", or a
 // custom `options` triple) mapped by index to 'have' | 'unsure' | 'no'.
+// The IRAS form already collects every simple choice itself, so the readiness
+// check does NOT re-ask them. It confirms only the three things a person often
+// has NOT pinned down and genuinely needs before a report is worth filing —
+// each a single tap of "I have this / Not sure / No". The resolution screen
+// (js/gate.js) then tells them plainly whether they are ready, and names what
+// to find out if not.
 export const readiness = {
-  part: { name: "Part 0: Readiness", estimate: "~3 mins" },
+  part: { name: "Readiness check", estimate: "~1 min" },
   items: [
     {
-      id: "reportingOn",
-      kind: "select",
-      multi: false,
-      crucial: "who",
-      prompt: "Who are you reporting on?",
-      hint: "Pick one. The form asks this first.",
-      options: [
-        "An individual",
-        "A business",
-        "Both an individual and a business",
-      ],
-    },
-    {
-      id: "identityDetails",
+      id: "whoKnown",
       kind: "verify",
       crucial: "who",
-      prompt:
-        "Do you have their identity details — a name, plus any address, NRIC/FIN or UEN you happen to know?",
-      hint: "You will type these into the form itself, not here.",
+      prompt: "Do you know who to report — a name for the person or business?",
+      hint: "Ideally also an address, NRIC/FIN or UEN. Without at least a name, IRAS has little to act on.",
+      // Group label surfaced on the resolution screen when this is thin.
+      gap: "who is involved — at least a name",
     },
     {
-      id: "taxTypes",
-      kind: "select",
-      multi: true,
+      id: "whatKnown",
+      kind: "verify",
       crucial: "what",
-      prompt: "Which type(s) of tax are involved?",
-      hint: "Pick any that apply.",
-      options: [
-        "Individual Income Tax",
-        "Corporate Income Tax",
-        "GST",
-        "Property Tax",
-        "Stamp Duties",
-        "Others",
-      ],
+      prompt: "Can you describe what they did, and roughly when?",
+      hint: "Even an approximate account and time period is enough to begin — the app helps you word it later.",
+      gap: "what happened, and roughly when",
     },
     {
-      id: "behaviours",
-      kind: "select",
-      multi: true,
-      crucial: "what",
-      prompt: "What best describes what happened?",
-      hint: "Pick any that apply.",
-      options: [
-        "Did not file a tax return or notify chargeability to tax",
-        "Under-declared or omitted income, sales or turnover",
-        "Over-claimed or fictitious expenses, deductions or reliefs",
-        "Fraudulent GST refund or input tax claims",
-        "Failure to register for GST when required",
-        "Charging or collecting GST without GST registration",
-        "Falsifying records, invoices or documents",
-        "Dealing in cash to hide income or under-report earnings",
-        "Not issuing receipts or keeping proper records",
-        "Others",
-      ],
-    },
-    {
-      id: "timing",
+      id: "howKnown",
       kind: "verify",
-      prompt:
-        "Do you know roughly when this happened — a period, a year, or specific dates?",
-      hint: "Even an approximate period helps.",
-    },
-    {
-      id: "amount",
-      kind: "verify",
-      prompt: "Do you have a sense of the amount or value involved?",
-      hint: "A rough figure is fine; an exact one is not required.",
-    },
-    {
-      id: "whoElse",
-      kind: "verify",
-      prompt: "Do you know who else, if anyone, was involved?",
-      hint: "This is optional on the form.",
-    },
-    {
-      id: "evidence",
-      kind: "select",
-      multi: true,
       crucial: "how",
-      prompt: "What can you point to as supporting information?",
-      hint: "Pick any that apply. You can attach files on the form later.",
-      options: Object.keys(evidenceAttachments),
-    },
-    {
-      id: "relationship",
-      kind: "select",
-      multi: true,
-      crucial: "how",
-      prompt: "How did you come to know about this?",
-      hint: "Pick any that apply.",
-      options: [
-        "I am, or was, an employee",
-        "I am, or was, a business partner or associate",
-        "I am, or was, a customer or client",
-        "I am, or was, a supplier or contractor",
-        "Through a personal or family connection",
-        "A competitor in the same trade",
-        "A member of the public",
-        "Others",
-      ],
-    },
-    {
-      // Intentional override (TRD-5.10): unlike every other `kind:'verify'`
-      // item (which omits `options` and falls back to the generic
-      // optionsFor() triple "I have this" / "Not sure" / "No"), this item
-      // supplies its own three labels because a yes/no HISTORY question
-      // ("have you already reported this before?") reads better as
-      // "Yes, already reported" / "No, not yet" than the generic verify
-      // triple. The underlying stored value tokens are unchanged from the
-      // standard verify-item contract: optionsFor() still maps these 3
-      // custom labels to the same canonical have/unsure/no values by index
-      // (checklist.js's optionsFor), so cheatsheet.js's buildCheatSheet
-      // ("Reported this to IRAS before" row) keeps working unchanged.
-      id: "priorIras",
-      kind: "verify",
-      prompt: "Have you already reported this to IRAS before?",
-      hint: "The form asks whether this is a repeat report.",
-      options: ["Yes, already reported", "Not sure", "No, not yet"],
-    },
-    {
-      id: "reward",
-      kind: "select",
-      multi: false,
-      prompt:
-        "Do you want to be considered for the informant reward (up to ~S$100,000, at IRAS's discretion)?",
-      hint: "A reward is only possible if you let IRAS contact you.",
-      options: ["Yes, and I confirm the requirements", "No"],
-    },
-    {
-      id: "contact",
-      kind: "select",
-      multi: false,
-      prompt: "How may IRAS contact you, if at all?",
-      hint: "Staying anonymous means no reward is possible.",
-      options: ["Email", "Phone", "I do not wish to be contacted"],
+      prompt: "Do you have something to point to, or a first-hand account of how you know?",
+      hint: "Documents you kept (invoices, messages, records) — or simply what you saw or handled yourself.",
+      gap: "how you know — anything you can point to",
     },
   ],
 };

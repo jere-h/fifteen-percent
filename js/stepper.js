@@ -125,5 +125,9 @@ export function createStepper(config) {
   // consistently on first paint too).
   goTo(activeIndex);
 
-  return { goTo: goTo, advance: advance, retreat: retreat };
+  // refreshControls re-applies the persistent control bar for the CURRENT step
+  // WITHOUT repainting the step body — used when an answer commit on the last
+  // step changes finish.isEnabled() (e.g. the final crucial item just became
+  // answered), so the persistent Next enables without a full re-render.
+  return { goTo: goTo, advance: advance, retreat: retreat, refreshControls: applyStepControls };
 }

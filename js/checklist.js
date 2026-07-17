@@ -244,7 +244,7 @@ export function renderChecklist(rootEl, draft, onChange) {
     el(
       'p',
       'checklist__intro',
-      'The form already collects the simple choices itself. This quick check just confirms you have what it will ask for — nothing here is typed into the form or sent anywhere.'
+      'Three quick questions — the things people often have not pinned down yet. The form collects everything else itself. Nothing here is typed into the form or sent anywhere.'
     )
   );
 
@@ -281,6 +281,9 @@ export function renderChecklist(rootEl, draft, onChange) {
   // stepperApi is assigned once createStepper() below returns; the "Edit" links
   // built here only run later, on click, by which time it is always assigned.
   let stepperApi = null;
+  // The current step's inline finish button, tracked so a commit on the last
+  // step can live-enable it (set only while the last step is painted).
+  let finishBtnRef = null;
 
   function renderSummaries(activeIndex) {
     summariesEl.textContent = '';
@@ -327,13 +330,20 @@ export function renderChecklist(rootEl, draft, onChange) {
       new CustomEvent('draft:changed', { detail: { field: 'readiness.' + id, value } })
     );
     updateProgress();
+    // Answering the LAST crucial item flips the finish gate. Refresh both the
+    // inline finish button and the persistent Next without repainting the step,
+    // so "Check my readiness →" enables as soon as the final answer is tapped.
+    const enabled = readinessCrucialAnswered(draft);
+    if (finishBtnRef) finishBtnRef.disabled = !enabled;
+    if (stepperApi && stepperApi.refreshControls) stepperApi.refreshControls();
   };
 
-  // Evaluate the advisory gate, persist it, and route: pass -> Part 1;
-  // otherwise -> the "gather this first" redirect. Preserves any prior
-  // acknowledgedRedirect so re-running readiness never silently re-locks.
-  // Passed to the stepper only as an opaque finish.onFinish callback
-  // (TRD-5.1/5.13) — stepper.js never sees this routing logic.
+  // Evaluate the advisory gate, persist it, and route to the RESOLUTION screen
+  // in BOTH cases (issue 4: the check always ends with a clear result). The
+  // resolution screen names any gaps and carries the "Begin Part 1 / Continue
+  // anyway" forward action. Preserves any prior acknowledgedRedirect so
+  // re-running readiness never silently re-locks. Passed to the stepper only as
+  // an opaque finish.onFinish callback — stepper.js never sees this routing.
   function finishReadiness() {
     const result = evaluateGate(draft);
     const prev = (draft.readiness && draft.readiness.gate) || {};
@@ -349,7 +359,7 @@ export function renderChecklist(rootEl, draft, onChange) {
       /* best-effort */
     }
     document.dispatchEvent(new CustomEvent('draft:changed'));
-    showScreen(result.passed ? 'part1' : 'redirect');
+    showScreen('redirect');
   }
 
   // painted flips true after the very first paint, so only THAT paint skips
@@ -362,6 +372,7 @@ export function renderChecklist(rootEl, draft, onChange) {
     painted = true;
 
     stepHost.textContent = '';
+    finishBtnRef = null;
     if (!total) return;
     const item = items[index];
     const body = buildStepBody(item, draft, commit, index, ctx.total);
@@ -379,6 +390,7 @@ export function renderChecklist(rootEl, draft, onChange) {
       finishBtn.type = 'button';
       finishBtn.disabled = !readinessCrucialAnswered(draft);
       finishBtn.addEventListener('click', finishReadiness);
+      finishBtnRef = finishBtn;
       nav.appendChild(finishBtn);
     } else {
       const next = el('button', 'checklist__next', 'Next →');

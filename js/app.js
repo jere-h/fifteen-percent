@@ -20,7 +20,7 @@ import {
   clear as clearDraft,
 } from './store.js';
 import { renderChecklist } from './checklist.js';
-import { renderRedirect } from './gate.js';
+import { renderRedirect, evaluateGate } from './gate.js';
 import { renderPartHeaders, renderBuilder } from './builders.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
@@ -125,21 +125,18 @@ function acknowledgeRedirect() {
   showScreen('part1');
 }
 
-// Paint the dynamic "gather this first" redirect body (naming the thin crucial
-// group) and mirror its "Continue anyway" onto the persistent Next control.
+// Paint the readiness RESOLUTION screen (ready vs. gaps) and label the
+// persistent Next as the forward action: "Begin Part 1 →" when ready, or
+// "Continue anyway →" when there are gaps. Both proceed via acknowledgeRedirect.
 function renderRedirectScreen() {
   const screen = el('screen-redirect');
   if (!screen) return;
   safeRender('redirect', function () {
-    renderRedirect(screen, currentDraft, {
-      onContinue: acknowledgeRedirect,
-      onBackToMenu: function () {
-        showScreen('home');
-      },
-    });
+    renderRedirect(screen, currentDraft);
   });
+  const passed = evaluateGate(currentDraft).passed;
   setControls({
-    next: { label: 'Continue anyway →' },
+    next: { label: passed ? 'Begin Part 1 →' : 'Continue anyway →' },
     onNext: acknowledgeRedirect,
   });
 }
@@ -278,12 +275,16 @@ function boot() {
     renderDependent();
   });
 
-  // The redirect screen's body depends on the live gate result, so (re)paint it
-  // on entry. Fired by the router after it applies the default control bar, so
-  // renderRedirectScreen's setControls override wins.
+  // Some screens override the control bar on entry (fired by the router AFTER it
+  // applies the default bar, so these overrides win):
+  //   - redirect (readiness resolution): dynamic forward label + live body.
+  //   - intro2 (Part 2 breather): relabel Next to "Begin Part 2 →".
   document.addEventListener('screen:changed', function (e) {
-    if (e && e.detail && e.detail.name === 'redirect') {
+    if (!e || !e.detail) return;
+    if (e.detail.name === 'redirect') {
       renderRedirectScreen();
+    } else if (e.detail.name === 'intro2') {
+      setControls({ next: { label: 'Begin Part 2 →' } });
     }
   });
 }

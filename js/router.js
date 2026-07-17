@@ -20,9 +20,10 @@
 //                                    FLOW-derived Back/Menu/Next; distinct from
 //                                    the no-op setControls(null))
 
-// Canonical order. 'redirect' is a member but sits OFF the linear path — the
-// readiness gate routes to it explicitly; Next/Back on the neighbours skip it.
-const SCREENS = ['home', 'readiness', 'redirect', 'part1', 'part2', 'assembly', 'transfer'];
+// Canonical order. 'redirect' is the readiness RESOLUTION screen: the gate
+// routes to it explicitly after the check and it leads into Part 1. 'intro2' is
+// the breather between Part 1 and Part 2 (issue 9).
+const SCREENS = ['home', 'readiness', 'redirect', 'part1', 'intro2', 'part2', 'assembly', 'transfer'];
 
 // Linear next/prev map. readiness<->part1 skip 'redirect'; the gate may still
 // send the user to 'redirect', whose Back returns to readiness.
@@ -33,16 +34,16 @@ const FLOW = {
   // phase-menu's own "Readiness check" item — never the persistent bar.
   home: {},
   readiness: { prev: 'home', next: 'part1' },
+  // The readiness RESOLUTION screen: Back returns to the check; Next continues
+  // into Part 1 (app.js overrides the Next label to "Begin Part 1" / "Continue
+  // anyway" and routes through acknowledgeRedirect).
   redirect: { prev: 'readiness', next: 'part1' },
-  // part1.prev is 'readiness', NOT 'redirect' — confirmed intentional
-  // (TRD-5.12). 'redirect' is a detour off the main linear Back-chain,
-  // reachable only via the readiness gate's fail branch
-  // (checklist.js's finishReadiness), never as a screen a user Back-navigates
-  // through. So Back from part1 always returns to readiness, whether the
-  // reader arrived via Redirect's "Continue anyway" or via a passing gate
-  // straight from Readiness.
-  part1: { prev: 'readiness', next: 'part2' },
-  part2: { prev: 'part1', next: 'assembly' },
+  // part1.prev is 'redirect' — the reader always reaches Part 1 through the
+  // readiness resolution, so Back from Part 1 returns there. part1.next is the
+  // 'intro2' breather, not part2 directly (issue 9).
+  part1: { prev: 'redirect', next: 'intro2' },
+  intro2: { prev: 'part1', next: 'part2' },
+  part2: { prev: 'intro2', next: 'assembly' },
   assembly: { prev: 'part2', next: 'transfer' },
   transfer: { prev: 'assembly' },
 };
@@ -50,8 +51,9 @@ const FLOW = {
 const SCREEN_LABELS = {
   home: 'Home',
   readiness: 'Readiness check',
-  redirect: 'Gather your details',
+  redirect: 'Readiness result',
   part1: 'Part 1: What happened',
+  intro2: 'Next: Part 2',
   part2: 'Part 2: How you became aware',
   assembly: 'Review your draft',
   transfer: 'Copy into the IRAS form',

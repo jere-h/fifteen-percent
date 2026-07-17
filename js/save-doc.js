@@ -102,10 +102,10 @@ export function buildDocument(draft) {
   out.push(model.ft2.text && model.ft2.text.trim() !== '' ? model.ft2.text.trim() : '(not drafted yet)');
   out.push('');
 
-  // Cheat-sheet — reminders of what to SELECT in the form, not text to paste.
+  // Readiness recap — what to be ready with before opening the form.
   out.push(thin);
-  out.push('IN THE FORM YOU WILL ALSO SELECT');
-  out.push('(these are reminders of what to pick — not text to paste)');
+  out.push('BEFORE YOU OPEN THE FORM, BE READY TO');
+  out.push('(a recap of your readiness check — not text to paste)');
   out.push(thin);
   sheet.forEach((row) => {
     out.push('- ' + row.label + ': ' + row.value);
