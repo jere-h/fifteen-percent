@@ -1,12 +1,15 @@
-// gate.js — the advisory readiness gate + the "gather this first" redirect.
+// gate.js — the advisory readiness gate + the readiness RESOLUTION screen.
 //
 // PURE evaluation (evaluateGate / gateGaps / readinessCrucialAnswered) reads
 // ONLY draft.readiness.answers — no DOM, no storage, no network — so it is
 // unit-testable in isolation and can never characterise conduct or predict an
-// outcome. renderRedirect paints the procedural "here is what to gather" screen.
+// outcome. renderResolution paints the readiness result: a clear "you're ready"
+// or a plain "you may want to find out more about X first", and doubles as the
+// breather that introduces Part 1.
 //
-// The gate is ADVISORY: it names which crucial group is thin and offers a
-// "Continue anyway" path. It never blocks or judges.
+// The gate is ADVISORY: it names which crucial thing is thin and always offers
+// a "Continue anyway" path (carried by the persistent control bar, not an
+// in-screen button). It never blocks or judges.
 
 import { readiness } from './data.js';
 
@@ -14,83 +17,42 @@ function answers(draft) {
   return (draft && draft.readiness && draft.readiness.answers) || {};
 }
 
-function arr(v) {
-  return Array.isArray(v) ? v : [];
-}
-
 function hasValue(v) {
   return v != null && String(v).trim() !== '';
 }
 
-// The evidence sentinel that means "I have kept nothing" — the reporter's own
-// account only. Selecting just this does NOT clear the 'how' bar (see below).
-const NOTHING_KEPT = 'Nothing kept yet, only my account';
-
-// Is the finish control allowed? This is the "Next enabled" test — deliberately
-// DISTINCT from evaluateGate's satisfaction test. It gates only on the NON-multi
-// crucial items (the 'who' pair: reportingOn + identityDetails), which is what a
-// report minimally needs to name a subject.
-//
-// The multi-select crucial items (taxTypes/behaviours → 'what',
-// evidence/relationship → 'how') are intentionally NOT required here: leaving one
-// empty is a real, meaningful gap, and finish must stay reachable so the gate can
-// catch it and route to the "gather this first" Redirect. If finish required
-// every crucial item (including the multis), a satisfiable multi would be
-// indistinguishable from an unmet one and the what/how groups could never fail
-// the gate — the Redirect would only ever fire for the 'who' group.
-export function readinessCrucialAnswered(draft) {
-  const a = answers(draft);
+// The three crucial readiness items, in order (who / what / how).
+function crucialItems() {
   const items = (readiness && readiness.items) || [];
-  return items
-    .filter((it) => it && it.crucial && !it.multi)
-    .every((it) => hasValue(a[it.id]));
+  return items.filter((it) => it && it.crucial);
 }
 
-// Pure gate evaluation. Groups map to the vision's who / what / how:
-//   who  = who you're reporting on is identifiable
-//   what = which tax + what happened
-//   how  = your connection + something to point to
+// Is the finish control allowed? Every crucial item must have been answered
+// (with any of have / unsure / no) so the reader has been through all three and
+// the gate can then evaluate a genuine pass-or-gaps result.
+export function readinessCrucialAnswered(draft) {
+  const a = answers(draft);
+  return crucialItems().every((it) => hasValue(a[it.id]));
+}
+
+// Pure gate evaluation. Each of the three verify items passes only when the
+// reader affirmatively has it ('have'); 'unsure' or 'no' is a real, named gap.
 export function evaluateGate(draft) {
   const a = answers(draft);
-  const who = hasValue(a.reportingOn) && a.identityDetails === 'have';
-  const what = arr(a.taxTypes).length > 0 && arr(a.behaviours).length > 0;
-  // evidence is a multi-select stored as string[], so test its CONTENTS, not the
-  // whole array against a string. A report backed ONLY by the "nothing kept"
-  // sentinel (the reporter's own account, nothing to point to) does not satisfy
-  // 'how'; any other selected evidence — including an in-person account — does.
-  const ev = arr(a.evidence).filter((x) => x !== NOTHING_KEPT);
-  const how = arr(a.relationship).length > 0 && ev.length > 0;
+  const who = a.whoKnown === 'have';
+  const what = a.whatKnown === 'have';
+  const how = a.howKnown === 'have';
   return { who, what, how, passed: who && what && how };
 }
 
-// Procedural, non-characterising descriptions of each group's gap. Names what to
-// gather; never says an offence occurred or predicts what IRAS will do.
-const GAP_COPY = {
-  who: {
-    title: 'Who you are reporting on',
-    detail:
-      "A name for the person or business, plus any address, NRIC/FIN or UEN you happen to know. Without at least a name it is hard for IRAS to act.",
-  },
-  what: {
-    title: 'What is involved',
-    detail:
-      'Which type(s) of tax, and a short description of what appears to have happened.',
-  },
-  how: {
-    title: 'How you know',
-    detail:
-      'Your connection to it, and anything you can point to as supporting information.',
-  },
-};
-
-// The ordered list of missing groups for the redirect screen.
+// The ordered list of thin crucial things for the resolution screen. Each gap's
+// label comes from the item's own `gap` string in data.js, so copy lives in one
+// place. Names what to find out; never says an offence occurred.
 export function gateGaps(draft) {
-  const g = evaluateGate(draft);
-  const gaps = [];
-  if (!g.who) gaps.push({ group: 'who', ...GAP_COPY.who });
-  if (!g.what) gaps.push({ group: 'what', ...GAP_COPY.what });
-  if (!g.how) gaps.push({ group: 'how', ...GAP_COPY.how });
-  return gaps;
+  const a = answers(draft);
+  return crucialItems()
+    .filter((it) => a[it.id] !== 'have')
+    .map((it) => ({ id: it.id, title: it.gap || it.prompt }));
 }
 
 function el(tag, className, text) {
@@ -106,59 +68,80 @@ function announce(message) {
 }
 
 /**
- * renderRedirect(rootEl, draft, { onContinue, onBackToMenu })
- * Paints the "gather this first" screen body into #redirect-body, naming the
- * specific crucial group(s) that are thin. Both actions are >=44px buttons and
- * fully keyboard reachable. Nothing here is transmitted.
+ * renderRedirect(rootEl, draft, handlers) — the readiness RESOLUTION screen.
+ * Paints into #redirect-body and sets the screen heading + eyebrow. It renders
+ * one of two honest states and, either way, introduces Part 1 as the next step:
+ *   - ready:  "You have what the form needs" + a Part 1 breather.
+ *   - gaps:   "You can still start" + the named things to find out first.
+ * Forward ("Begin Part 1" / "Continue anyway") and Back are carried by the
+ * persistent control bar (app.js), not by in-screen buttons — one navigator,
+ * no duplicate Next. `handlers` is kept for API compatibility but unused here.
  */
 export function renderRedirect(rootEl, draft, handlers) {
-  const body = rootEl && rootEl.querySelector
-    ? rootEl.querySelector('#redirect-body')
-    : null;
+  const screen = rootEl && rootEl.querySelector ? rootEl : null;
+  const body = screen ? screen.querySelector('#redirect-body') : null;
   if (!body) return;
   body.textContent = '';
 
+  const result = evaluateGate(draft);
   const gaps = gateGaps(draft);
-  const h = handlers || {};
 
-  const list = el('ul', 'redirect__list');
-  gaps.forEach((gap) => {
-    const li = el('li', 'redirect__item');
-    li.appendChild(el('span', 'redirect__item-title', gap.title));
-    li.appendChild(el('span', 'redirect__item-detail', gap.detail));
-    list.appendChild(li);
-  });
-  body.appendChild(list);
+  const eyebrow = screen.querySelector('#redirect-eyebrow');
+  const heading = screen.querySelector('#redirect-heading');
 
-  const note = el(
-    'p',
-    'redirect__note',
-    'Gather what you can, then come back — your other answers are saved. Or continue anyway; you can add these details on the form itself.'
+  if (result.passed) {
+    if (eyebrow) eyebrow.textContent = 'Readiness — done';
+    if (heading) heading.textContent = 'You have what the form needs';
+    body.appendChild(
+      el(
+        'p',
+        'screen__lead',
+        'You can name who is involved, describe what happened, and point to how you know. That is enough to file a useful report.'
+      )
+    );
+  } else {
+    if (eyebrow) eyebrow.textContent = 'Readiness — almost there';
+    if (heading) heading.textContent = 'You can start — a couple of things to firm up';
+    body.appendChild(
+      el(
+        'p',
+        'screen__lead',
+        'You can still continue now and add these on the form itself, but a stronger report names each of them. You may want to find out more about:'
+      )
+    );
+
+    const list = el('ul', 'redirect__list');
+    gaps.forEach((gap) => {
+      const li = el('li', 'redirect__item');
+      li.appendChild(el('span', 'redirect__item-title', gap.title));
+      list.appendChild(li);
+    });
+    body.appendChild(list);
+  }
+
+  // The breather that introduces the next phase (issue 9): the reader always
+  // knows exactly what comes next before they proceed.
+  const nextUp = el('div', 'phase-intro');
+  nextUp.appendChild(el('span', 'phase-intro__kicker', 'Next — Part 1 of the drafting'));
+  nextUp.appendChild(
+    el('span', 'phase-intro__name', 'What happened')
   );
-  body.appendChild(note);
+  nextUp.appendChild(
+    el(
+      'span',
+      'phase-intro__desc',
+      'Tap through a few choices and the app writes the wording for you. About 5 minutes. Use ' +
+        (result.passed ? '“Begin Part 1 →”' : '“Continue anyway →”') +
+        ' below when you are ready, or Back to revisit the check.'
+    )
+  );
+  body.appendChild(nextUp);
 
-  const actions = el('div', 'redirect__actions');
-
-  const cont = el('button', 'btn btn--primary redirect__continue', 'Continue anyway');
-  cont.type = 'button';
-  cont.addEventListener('click', function () {
-    if (typeof h.onContinue === 'function') h.onContinue();
-  });
-  actions.appendChild(cont);
-
-  const menu = el('button', 'btn btn--secondary redirect__menu', 'Back to menu');
-  menu.type = 'button';
-  menu.addEventListener('click', function () {
-    if (typeof h.onBackToMenu === 'function') h.onBackToMenu();
-  });
-  actions.appendChild(menu);
-
-  body.appendChild(actions);
-
-  const titles = gaps.map((g) => g.title.toLowerCase());
   announce(
-    titles.length
-      ? 'A few things to gather first: ' + titles.join('; ') + '.'
-      : 'A few things to gather first.'
+    result.passed
+      ? 'You have what the form needs. Next, Part 1: what happened.'
+      : 'You can start. A couple of things to firm up first: ' +
+          gaps.map((g) => g.title).join('; ') +
+          '.'
   );
 }

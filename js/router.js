@@ -13,18 +13,14 @@
 // Public API:
 //   showScreen(name, { focus })   -> void   (focus defaults to true)
 //   getScreen()                   -> string
-//   setControls({ back, next, onBack, onNext }) -> void  (per-screen override)
-//   clearControls()               -> void   (TRD-5.2: a REAL reset — discards
-//                                    any active override so the control bar
-//                                    falls back entirely to the plain
-//                                    FLOW-derived Back/Menu/Next; distinct from
-//                                    the no-op setControls(null))
+//   setControls({ back, next, onBack, onNext }) -> void  (per-screen override;
+//                                    pass a side as `undefined` to clear that
+//                                    side's override back to the FLOW default)
 
-import { openModal, closeModal } from './modal.js';
-
-// Canonical order. 'redirect' is a member but sits OFF the linear path — the
-// readiness gate routes to it explicitly; Next/Back on the neighbours skip it.
-const SCREENS = ['home', 'readiness', 'redirect', 'part1', 'part2', 'assembly', 'transfer'];
+// Canonical order. 'redirect' is the readiness RESOLUTION screen: the gate
+// routes to it explicitly after the check and it leads into Part 1. 'intro2' is
+// the breather between Part 1 and Part 2 (issue 9).
+const SCREENS = ['home', 'readiness', 'redirect', 'part1', 'intro2', 'part2', 'assembly', 'transfer'];
 
 // Linear next/prev map. readiness<->part1 skip 'redirect'; the gate may still
 // send the user to 'redirect', whose Back returns to readiness.
@@ -35,16 +31,16 @@ const FLOW = {
   // phase-menu's own "Readiness check" item — never the persistent bar.
   home: {},
   readiness: { prev: 'home', next: 'part1' },
+  // The readiness RESOLUTION screen: Back returns to the check; Next continues
+  // into Part 1 (app.js overrides the Next label to "Begin Part 1" / "Continue
+  // anyway" and routes through acknowledgeRedirect).
   redirect: { prev: 'readiness', next: 'part1' },
-  // part1.prev is 'readiness', NOT 'redirect' — confirmed intentional
-  // (TRD-5.12). 'redirect' is a detour off the main linear Back-chain,
-  // reachable only via the readiness gate's fail branch
-  // (checklist.js's finishReadiness), never as a screen a user Back-navigates
-  // through. So Back from part1 always returns to readiness, whether the
-  // reader arrived via Redirect's "Continue anyway" or via a passing gate
-  // straight from Readiness.
-  part1: { prev: 'readiness', next: 'part2' },
-  part2: { prev: 'part1', next: 'assembly' },
+  // part1.prev is 'redirect' — the reader always reaches Part 1 through the
+  // readiness resolution, so Back from Part 1 returns there. part1.next is the
+  // 'intro2' breather, not part2 directly (issue 9).
+  part1: { prev: 'redirect', next: 'intro2' },
+  intro2: { prev: 'part1', next: 'part2' },
+  part2: { prev: 'intro2', next: 'assembly' },
   assembly: { prev: 'part2', next: 'transfer' },
   transfer: { prev: 'assembly' },
 };
@@ -52,8 +48,9 @@ const FLOW = {
 const SCREEN_LABELS = {
   home: 'Home',
   readiness: 'Readiness check',
-  redirect: 'Gather your details',
+  redirect: 'Readiness result',
   part1: 'Part 1: What happened',
+  intro2: 'Next: Part 2',
   part2: 'Part 2: How you became aware',
   assembly: 'Review your draft',
   transfer: 'Copy into the IRAS form',
@@ -175,7 +172,9 @@ export function showScreen(name, opts) {
   if (focus) {
     announce(name);
     const screen = el('screen-' + name);
-    const heading = screen && screen.querySelector('h2[tabindex="-1"]');
+    // Each screen's focus target is its labelling heading with tabindex="-1".
+    // Home leads with an <h1>; every other screen an <h2>.
+    const heading = screen && screen.querySelector('h1[tabindex="-1"], h2[tabindex="-1"]');
     if (heading && typeof heading.focus === 'function') heading.focus();
   }
 
@@ -199,53 +198,13 @@ export function setControls(next) {
   applyControls();
 }
 
-/**
- * Discard any active per-screen control override and re-apply the plain
- * FLOW-derived Back/Menu/Next for the current screen (TRD-5.2). This is a
- * REAL reset — distinct from setControls(null), which merges {} onto whatever
- * `overrides` already held and therefore changes nothing.
- */
-export function clearControls() {
-  overrides = null;
-  applyControls();
-}
-
-// Build + wire the intro dialog from its <template>, then open it.
-function openIntroModal() {
-  const tpl = el('intro-modal-template');
-  if (!tpl || !tpl.content) return;
-  const first = tpl.content.firstElementChild;
-  if (!first) return;
-  const node = first.cloneNode(true);
-
-  const primary = node.querySelector('[data-action="start-readiness"]');
-  const secondary = node.querySelector('[data-action="dismiss"]');
-  if (primary) {
-    primary.addEventListener('click', function () {
-      closeModal();
-      showScreen('readiness');
-    });
-  }
-  if (secondary) {
-    secondary.addEventListener('click', function () {
-      closeModal();
-    });
-  }
-
-  openModal({ titleId: 'intro-modal-title', contentNode: node, invoker: el('home-start') });
-}
-
 function boot() {
-  // Home menu -> jump straight to a phase.
-  document.querySelectorAll('.home__menu-item').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      showScreen(btn.dataset.target);
-    });
-  });
-
-  // Start -> intro dialog.
+  // Start -> straight into the readiness check. The Home screen's phases
+  // overview already sets expectations, so no interstitial dialog is needed.
   const start = el('home-start');
-  if (start) start.addEventListener('click', openIntroModal);
+  if (start) start.addEventListener('click', function () {
+    showScreen('readiness');
+  });
 
   // Initial paint: Home, without stealing focus on load.
   showScreen('home', { focus: false });

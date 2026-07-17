@@ -21,6 +21,12 @@ import { freeTextBuilders, parts } from './data.js';
 import { buildNarrative, normalizeFragment } from './draft.js';
 import * as store from './store.js';
 import { createStepper } from './stepper.js';
+import { showScreen, setControls } from './router.js';
+
+// Which screen each builder hands off to when its last prompt is answered
+// (issue 8: the final tap moves you on). ft1 -> the Part 2 breather; ft2 ->
+// the Review. Kept here so the builder never needs to read the router's FLOW.
+const NEXT_SCREEN = { ft1: 'intro2', ft2: 'assembly' };
 
 // ---------------------------------------------------------------- Part headers
 
@@ -78,11 +84,6 @@ function ensureFreeText(draft, key) {
   return draft.freeText[key].answers;
 }
 
-// The unsure option of a prompt (there is at most one, by design).
-function unsureOption(prompt) {
-  return (prompt.options || []).find((o) => o && o.unsure) || null;
-}
-
 // Resolve the stored fragment for a prompt to a short human label for the
 // "so far" summary: a main-option label, a jog-entry label, or the manual text
 // itself (quoted) when the reader typed their own.
@@ -102,9 +103,37 @@ function summaryLabelFor(prompt, stored) {
 
 // ---------------------------------------------------------------- one prompt
 
-// Build the interactive body for a single prompt: counter + prompt + hint +
-// main radiogroup, with an unsure option's nested jog radiogroup revealed inline.
-function buildPromptBody(cfg, prompt, index, total, answers, commit) {
+// Arrow-key roving within a radiogroup's buttons: Up/Left and Down/Right move
+// focus, wrapping. Shared by the main options and the jog page.
+function wireRoving(buttons) {
+  buttons.forEach((btn, i) => {
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        buttons[(i + 1) % buttons.length].focus();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        buttons[(i - 1 + buttons.length) % buttons.length].focus();
+      }
+    });
+  });
+}
+
+// Set roving tabindex so the selected radio (or the first) is the single tab
+// stop, matching the WAI-ARIA radiogroup pattern.
+function setRoving(buttons) {
+  let checked = buttons.findIndex((b) => b.getAttribute('aria-checked') === 'true');
+  const rove = checked === -1 ? 0 : checked;
+  buttons.forEach((b, i) => {
+    b.tabIndex = i === rove ? 0 : -1;
+  });
+}
+
+// Build the MAIN options body for one prompt (issue 8: each tap moves you on).
+// A concrete option commits its fragment and advances; an "I don't know"
+// (omitIfUnrefined) commits nothing and advances; an "I'm not sure" (unsure)
+// opens the jog list as its OWN page via nav.openJog — never an inline reveal.
+function buildPromptBody(cfg, prompt, index, total, answers, commit, nav) {
   const stepEl = el('div', 'checklist__step builder__step is-active');
   stepEl.dataset.prompt = prompt.id;
 
@@ -118,257 +147,166 @@ function buildPromptBody(cfg, prompt, index, total, answers, commit) {
   stepEl.appendChild(promptEl);
 
   const hintId = promptId + '-hint';
-  const hintEl = el('p', 'checklist__hint', prompt.hint || 'Pick one.');
+  const hintEl = el('p', 'checklist__hint', prompt.hint || 'Tap an answer to continue.');
   hintEl.id = hintId;
   stepEl.appendChild(hintEl);
 
   const options = Array.isArray(prompt.options) ? prompt.options : [];
-  const unsure = unsureOption(prompt);
-
-  // Is a jog value currently the stored one? Then reveal the jog on first paint.
   const stored = answers[prompt.id];
-  let jogRevealed = false;
-  if (stored != null && unsure) {
-    const s = String(stored);
-    const isMain = options.some((o) => o.fragment === s);
-    if (!isMain) jogRevealed = true; // a jog fragment or manual text is stored
-  }
+  const storedStr = stored == null ? null : String(stored);
+  // A stored value that is NOT one of the main fragments came from the jog
+  // page (a jog fragment or manual text), so the unsure option reads selected.
+  const isJogValue =
+    storedStr != null && !options.some((o) => o.fragment === storedStr);
 
   const group = el('div', 'checklist__options builder__options');
   group.setAttribute('role', 'radiogroup');
   group.setAttribute('aria-labelledby', promptId);
   group.setAttribute('aria-describedby', hintId);
 
-  const mainButtons = [];
-  let jogWrap = null;
-  // Transient "I don't know" selection. An omitIfUnrefined pick stores NOTHING,
-  // so its highlighted/checked state lives only here (until navigation) — but it
-  // must still deselect every sibling, so exactly one radio is aria-checked.
-  let omitIndex = -1;
-
-  // Recompute selected/tab state across the main options. Exactly one radio may
-  // read as checked: a concrete stored fragment, an open unsure branch, or a
-  // transient omit pick — never two at once.
-  function refreshMain() {
-    const cur = answers[prompt.id];
-    const curStr = cur == null ? null : String(cur);
-    let checkedIdx = -1;
-    options.forEach((opt, i) => {
-      let selected = false;
-      if (i === omitIndex) {
-        selected = true; // transient "I don't know" highlight
-      } else if (opt.unsure) {
-        selected = jogRevealed; // the unsure branch reads "active" while open
-      } else if (opt.fragment != null) {
-        selected = curStr != null && opt.fragment === curStr;
-      }
-      const btn = mainButtons[i];
-      btn.classList.toggle('checklist__radio--selected', selected);
-      btn.setAttribute('aria-checked', selected ? 'true' : 'false');
-      if (selected && checkedIdx === -1) checkedIdx = i;
-    });
-    const rove = checkedIdx === -1 ? 0 : checkedIdx;
-    mainButtons.forEach((btn, i) => {
-      btn.tabIndex = i === rove ? 0 : -1;
-    });
-  }
-
-  function hideJog() {
-    jogRevealed = false;
-    if (jogWrap) jogWrap.hidden = true;
-  }
-
-  function showJog() {
-    jogRevealed = true;
-    if (jogWrap) jogWrap.hidden = false;
-  }
-
-  function moveMain(fromIdx, delta) {
-    if (!options.length) return;
-    const nextIdx = (fromIdx + delta + options.length) % options.length;
-    mainButtons[nextIdx].focus();
-  }
-
-  options.forEach((opt, i) => {
+  const buttons = [];
+  options.forEach((opt) => {
     const btn = el('button', 'checklist__radio', opt.label);
     btn.type = 'button';
     btn.setAttribute('role', 'radio');
+
+    let selected = false;
+    if (opt.fragment != null) selected = storedStr != null && opt.fragment === storedStr;
+    else if (opt.unsure) selected = isJogValue;
+    btn.classList.toggle('checklist__radio--selected', selected);
+    btn.setAttribute('aria-checked', selected ? 'true' : 'false');
+
     btn.addEventListener('click', () => {
       if (opt.unsure) {
-        // Reveal the jog list; store NOTHING until it is refined.
-        omitIndex = -1;
-        commit(prompt.id, null);
-        showJog();
-        refreshMain();
-        const first = jogWrap && jogWrap.querySelector('.checklist__radio');
-        if (first) first.focus();
+        nav.openJog(index, prompt, opt); // reveal-more as its own page
       } else if (opt.omitIfUnrefined) {
-        // "I don't know": contributes nothing. Clear any stored value + jog, and
-        // deselect every sibling so this is the sole aria-checked radio.
-        omitIndex = i;
-        commit(prompt.id, null);
-        hideJog();
-        refreshMain();
+        commit(prompt.id, null); // "I don't know" — contributes nothing
+        nav.forward(index);
       } else {
-        // A concrete choice: store its fragment, close any open jog.
-        omitIndex = -1;
-        const next = String(answers[prompt.id]) === opt.fragment ? null : opt.fragment;
-        commit(prompt.id, next);
-        hideJog();
-        refreshMain();
+        commit(prompt.id, opt.fragment);
+        nav.forward(index);
       }
     });
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        moveMain(i, 1);
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        moveMain(i, -1);
-      }
-    });
-    mainButtons.push(btn);
-    group.appendChild(btn);
 
-    // The jog list lives directly under its unsure option.
-    if (opt.unsure && Array.isArray(opt.jog)) {
-      jogWrap = buildJog(prompt, opt, answers, commit, promptId, () => {
-        refreshMain();
-      });
-      jogWrap.hidden = !jogRevealed;
-      group.appendChild(jogWrap);
-    }
+    buttons.push(btn);
+    group.appendChild(btn);
   });
 
+  wireRoving(buttons);
+  setRoving(buttons);
   stepEl.appendChild(group);
-  refreshMain();
   return stepEl;
 }
 
-// The secondary jog-memory list: a nested radiogroup of more-specific
-// possibilities ending in a manual "type it myself" input.
-function buildJog(prompt, unsure, answers, commit, labelledById, afterChange) {
-  const wrap = el('div', 'builder__jog');
+// Build the JOG page — the "a bit more specific" list, shown as its own page
+// (issue 8) rather than an inline reveal. A jog option commits + advances; the
+// manual "type it myself" reveals an input that commits + advances on Enter.
+function buildJogBody(cfg, prompt, unsure, index, answers, commit, nav) {
+  const stepEl = el('div', 'checklist__step builder__step builder__jog-step is-active');
+  stepEl.dataset.prompt = prompt.id;
 
-  const titleId = 'builder-jog-title-' + prompt.id;
-  const title = el('p', 'builder__jog-title', 'A bit more specific — which is closest?');
+  stepEl.appendChild(
+    el('p', 'builder__step-counter', 'Prompt ' + (index + 1) + ' — more options')
+  );
+
+  const titleId = 'builder-jog-title-' + cfg.key + '-' + prompt.id;
+  const title = el('p', 'checklist__prompt', 'A bit more specific — which is closest?');
   title.id = titleId;
-  wrap.appendChild(title);
+  stepEl.appendChild(title);
+
+  const hintId = titleId + '-hint';
+  const hint = el('p', 'checklist__hint', 'Tap the closest fit, or type your own.');
+  hint.id = hintId;
+  stepEl.appendChild(hint);
+
+  const jog = Array.isArray(unsure.jog) ? unsure.jog : [];
+  const stored = answers[prompt.id];
+  const storedStr = stored == null ? null : String(stored);
+  const jogFragments = jog.filter((j) => j.fragment != null).map((j) => j.fragment);
+  const mainFragments = (prompt.options || [])
+    .filter((o) => o.fragment != null)
+    .map((o) => o.fragment);
+  // Manual entry is only "active" if the stored value is genuinely typed text —
+  // not a jog fragment and not a leftover MAIN-option fragment. Without the
+  // main-fragment check, re-opening the jog after a main pick would wrongly
+  // pre-fill the manual box with the app's composed clause.
+  const manualActiveInit =
+    storedStr != null &&
+    storedStr !== '' &&
+    jogFragments.indexOf(storedStr) === -1 &&
+    mainFragments.indexOf(storedStr) === -1;
 
   const list = el('div', 'checklist__options builder__jog-list');
   list.setAttribute('role', 'radiogroup');
   list.setAttribute('aria-labelledby', titleId);
+  list.setAttribute('aria-describedby', hintId);
 
-  const jog = Array.isArray(unsure.jog) ? unsure.jog : [];
   const buttons = [];
   let manualInput = null;
 
-  const stored = answers[prompt.id];
-  const storedStr = stored == null ? null : String(stored);
-  const jogFragments = jog.filter((j) => j.fragment != null).map((j) => j.fragment);
-  let manualActive =
-    storedStr != null && storedStr !== '' && jogFragments.indexOf(storedStr) === -1
-      ? true
-      : false;
-
-  function refreshJog() {
-    const cur = answers[prompt.id];
-    const curStr = cur == null ? null : String(cur);
-    let checkedIdx = -1;
-    jog.forEach((j, i) => {
-      let selected = false;
-      if (j.manual) selected = manualActive;
-      else selected = curStr != null && j.fragment === curStr;
-      const btn = buttons[i];
-      btn.classList.toggle('checklist__radio--selected', selected);
-      btn.setAttribute('aria-checked', selected ? 'true' : 'false');
-      if (selected && checkedIdx === -1) checkedIdx = i;
-    });
-    const rove = checkedIdx === -1 ? 0 : checkedIdx;
-    buttons.forEach((btn, i) => {
-      btn.tabIndex = i === rove ? 0 : -1;
-    });
-  }
-
-  function moveJog(fromIdx, delta) {
-    if (!jog.length) return;
-    const nextIdx = (fromIdx + delta + jog.length) % jog.length;
-    buttons[nextIdx].focus();
-  }
-
-  jog.forEach((j, i) => {
+  jog.forEach((j) => {
     const btn = el('button', 'checklist__radio builder__jog-option', j.label);
     btn.type = 'button';
     btn.setAttribute('role', 'radio');
+
+    const selected = j.manual
+      ? manualActiveInit
+      : storedStr != null && j.fragment === storedStr;
+    btn.classList.toggle('checklist__radio--selected', selected);
+    btn.setAttribute('aria-checked', selected ? 'true' : 'false');
+
     btn.addEventListener('click', () => {
       if (j.manual) {
-        manualActive = true;
-        commit(prompt.id, null); // nothing stored until the reader types + commits
         if (manualInput) {
           manualInput.hidden = false;
           manualInput.focus();
         }
       } else {
-        manualActive = false;
-        if (manualInput) manualInput.hidden = true;
-        const next = String(answers[prompt.id]) === j.fragment ? null : j.fragment;
-        commit(prompt.id, next);
-      }
-      refreshJog();
-      if (typeof afterChange === 'function') afterChange();
-    });
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        moveJog(i, 1);
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        moveJog(i, -1);
+        commit(prompt.id, j.fragment);
+        nav.forward(index);
       }
     });
+
     buttons.push(btn);
     list.appendChild(btn);
   });
 
-  wrap.appendChild(list);
+  wireRoving(buttons);
+  setRoving(buttons);
+  stepEl.appendChild(list);
 
-  // Manual "type it myself" input — a real textbox, committing on blur/Enter.
+  // Manual "type it myself" input — commits on Enter and advances; a plain blur
+  // persists the text without navigating (so tabbing away is not a surprise).
   const manualEntry = jog.find((j) => j.manual);
   if (manualEntry) {
     manualInput = el('input', 'checklist__text builder__manual-input');
     manualInput.type = 'text';
-    manualInput.setAttribute(
-      'aria-label',
-      'Type your own answer for: ' + (prompt.prompt || '')
-    );
-    manualInput.placeholder = 'Type it in your own words…';
-    if (manualActive && storedStr) manualInput.value = storedStr;
-    manualInput.hidden = !manualActive;
+    manualInput.setAttribute('aria-label', 'Type your own answer for: ' + (prompt.prompt || ''));
+    manualInput.placeholder = 'Type it in your own words, then press Enter…';
+    if (manualActiveInit && storedStr) manualInput.value = storedStr;
+    manualInput.hidden = !manualActiveInit;
 
-    const commitManual = () => {
-      // Normalized (TRD-5.5): trimmed, trailing .!? stripped, first letter
-      // lowercased UNLESS the text starts with the pronoun "I" — several
-      // authored jog/option fragments for this exact prompt already start
-      // with a capitalised "I" (see js/draft.js's normalizeFragment doc), so a
-      // manual entry must never be lowercased into "i …".
-      const text = normalizeFragment(manualInput.value);
-      manualActive = true;
-      commit(prompt.id, text === '' ? null : text);
-      refreshJog();
-      if (typeof afterChange === 'function') afterChange();
-    };
-    manualInput.addEventListener('blur', commitManual);
     manualInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        manualInput.blur();
+        // Normalized (TRD-5.5): trimmed, trailing .!? stripped, first letter
+        // lowercased UNLESS it starts with the pronoun "I".
+        const text = normalizeFragment(manualInput.value);
+        if (text !== '') {
+          commit(prompt.id, text);
+          nav.forward(index);
+        }
       }
     });
-    wrap.appendChild(manualInput);
+    manualInput.addEventListener('blur', () => {
+      const text = normalizeFragment(manualInput.value);
+      commit(prompt.id, text === '' ? null : text);
+    });
+
+    stepEl.appendChild(manualInput);
   }
 
-  refreshJog();
-  return wrap;
+  return stepEl;
 }
 
 // ---------------------------------------------------------------- renderBuilder
@@ -406,12 +344,17 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   progress.setAttribute('role', 'status');
   rootEl.appendChild(progress);
 
+  // On desktop the prompts (left) and the live "paste-ready text so far" (right)
+  // sit side by side (issue 5); on mobile they stack. The cols wrapper carries
+  // that responsive layout.
+  const cols = el('div', 'builder__cols');
+
   const wizard = el('div', 'checklist checklist--stepped builder__wizard');
   const summariesEl = el('div', 'checklist__summaries');
   const stepHost = el('div', 'checklist__stephost');
   wizard.appendChild(summariesEl);
   wizard.appendChild(stepHost);
-  rootEl.appendChild(wizard);
+  cols.appendChild(wizard);
 
   // Live preview of the growing block.
   const preview = el('div', 'builder__preview');
@@ -420,7 +363,9 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   previewText.setAttribute('role', 'status');
   previewText.setAttribute('aria-live', 'off');
   preview.appendChild(previewText);
-  rootEl.appendChild(preview);
+  cols.appendChild(preview);
+
+  rootEl.appendChild(cols);
 
   function promptAnswered(prompt) {
     const v = answers[prompt.id];
@@ -525,6 +470,31 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   // moving focus (mirrors the old paintActive(focusIt) contract).
   let painted = false;
 
+  // Paint the JOG page for one prompt (issue 8). Swaps the step body imperatively
+  // (NOT via the stepper, so its default control bar is not re-applied) and takes
+  // over the persistent bar: Back returns to this prompt's main options; Next
+  // skips the prompt entirely. Selecting a jog option / typing a manual answer
+  // commits and advances via nav.forward.
+  function paintJog(index, ctx, nav, prompt, unsure) {
+    stepHost.textContent = '';
+    const jogBody = buildJogBody(cfg, prompt, unsure, index, answers, commit, nav);
+    stepHost.appendChild(jogBody);
+    announce('More options for: ' + (prompt.prompt || ''));
+    const first = jogBody.querySelector('.checklist__radio');
+    if (first) first.focus();
+    setControls({
+      back: { label: '← Back', disabled: false },
+      onBack: function () {
+        ctx.goTo(index); // repaint the main options + restore the default bar
+      },
+      next: { label: 'Skip →', disabled: false },
+      onNext: function () {
+        commit(prompt.id, null);
+        nav.forward(index);
+      },
+    });
+  }
+
   function renderStep(index, ctx) {
     const focusIt = painted;
     painted = true;
@@ -532,30 +502,20 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     stepHost.textContent = '';
     if (!total) return;
     const prompt = prompts[index];
-    const body = buildPromptBody(cfg, prompt, index, ctx.total, answers, commit);
 
-    const nav = el('div', 'checklist__nav');
-    const back = el('button', 'checklist__back', '← Previous');
-    back.type = 'button';
-    back.disabled = index === 0;
-    back.addEventListener('click', ctx.retreat);
-    nav.appendChild(back);
+    // The one navigator the option handlers use. forward advances to the next
+    // prompt, or hands off to the next screen when this is the last prompt.
+    const nav = {
+      forward: function (i) {
+        if (i < total - 1) ctx.advance();
+        else showScreen(NEXT_SCREEN[key] || 'assembly');
+      },
+      openJog: function (i, pr, unsure) {
+        paintJog(i, ctx, nav, pr, unsure);
+      },
+    };
 
-    if (!ctx.isLast) {
-      const next = el('button', 'checklist__next', 'Next →');
-      next.type = 'button';
-      next.addEventListener('click', ctx.advance);
-      nav.appendChild(next);
-    } else {
-      const doneNote = el(
-        'p',
-        'builder__done-note',
-        'That is the last prompt — use Next below to move on.'
-      );
-      nav.appendChild(doneNote);
-    }
-
-    body.appendChild(nav);
+    const body = buildPromptBody(cfg, prompt, index, ctx.total, answers, commit, nav);
     stepHost.appendChild(body);
 
     announce('Prompt ' + (index + 1) + ' of ' + ctx.total + ': ' + (prompt.prompt || ''));
@@ -583,10 +543,10 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   updateProgress();
   updatePreview();
 
-  // Part 1 / Part 2 pass no `finish` config: their last prompt has no inline
-  // Next (see renderStep above) and the persistent bar falls back to the
-  // plain FLOW-derived Next (router.clearControls(), inside stepper.js) —
-  // only tapping it on the last prompt moves on to the next screen.
+  // Part 1 / Part 2 pass no `finish` config: on the last prompt the persistent
+  // Next falls through to the FLOW-derived next screen (stepper.js), while a tap
+  // on the final option auto-advances there via nav.forward. Back on the last
+  // prompt still steps to the previous prompt (stepper owns both ends now).
   stepperApi = createStepper({
     screenName: key === 'ft1' ? 'part1' : 'part2',
     total: total,

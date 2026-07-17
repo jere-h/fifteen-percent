@@ -85,7 +85,11 @@ function summaryValue(draft, item) {
 }
 
 // --- single-select (select-single AND verify): WAI-ARIA radio pattern -------
-function renderSingleChoice(stepEl, item, draft, commit, promptId, hintId) {
+// Tapping an option commits it and immediately advances (issue 8: each tap moves
+// you on; press Back to change). Arrow keys move focus only — they no longer
+// commit — so a keyboard user chooses with Space/Enter and does not skip ahead
+// by arrowing.
+function renderSingleChoice(stepEl, item, draft, commit, promptId, hintId, onAdvance) {
   const wrap = el('div', 'checklist__options');
   wrap.setAttribute('role', 'radiogroup');
   if (promptId) wrap.setAttribute('aria-labelledby', promptId);
@@ -95,57 +99,37 @@ function renderSingleChoice(stepEl, item, draft, commit, promptId, hintId) {
   const buttons = [];
   const current = () => draft.readiness.answers[item.id];
 
-  function refresh() {
-    const cur = current();
-    let checkedIdx = pairs.findIndex((p) => p.value === cur);
-    buttons.forEach((btn, i) => {
-      const selected = pairs[i].value === cur;
-      btn.classList.toggle('checklist__radio--selected', selected);
-      btn.setAttribute('aria-checked', selected ? 'true' : 'false');
-      const rove = checkedIdx === -1 ? 0 : checkedIdx;
-      btn.tabIndex = i === rove ? 0 : -1;
-    });
-  }
+  const cur = current();
+  let checkedIdx = pairs.findIndex((p) => p.value === cur);
+  const rove = checkedIdx === -1 ? 0 : checkedIdx;
 
-  function move(fromIdx, delta) {
-    if (!pairs.length) return;
-    const nextIdx = (fromIdx + delta + pairs.length) % pairs.length;
-    commit(item.id, pairs[nextIdx].value); // arrow always selects, never clears
-    refresh();
-    buttons[nextIdx].focus();
+  function choose(value) {
+    commit(item.id, value);
+    if (typeof onAdvance === 'function') onAdvance();
   }
 
   pairs.forEach((pair, i) => {
     const btn = el('button', 'checklist__radio', pair.label);
     btn.type = 'button';
     btn.setAttribute('role', 'radio');
-    btn.addEventListener('click', () => {
-      // Re-tapping the selected option clears it, so a phone mis-tap is easy to
-      // undo.
-      const next = current() === pair.value ? null : pair.value;
-      commit(item.id, next);
-      refresh();
-    });
+    const selected = pair.value === cur;
+    btn.classList.toggle('checklist__radio--selected', selected);
+    btn.setAttribute('aria-checked', selected ? 'true' : 'false');
+    btn.tabIndex = i === rove ? 0 : -1;
+    btn.addEventListener('click', () => choose(pair.value));
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
-        move(i, 1);
+        buttons[(i + 1) % buttons.length].focus();
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        move(i, -1);
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        move(-1, 1);
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        move(0, -1);
+        buttons[(i - 1 + buttons.length) % buttons.length].focus();
       }
     });
     buttons.push(btn);
     wrap.appendChild(btn);
   });
 
-  refresh();
   stepEl.appendChild(wrap);
 }
 
@@ -187,7 +171,8 @@ function renderMultiSelect(stepEl, item, draft, commit, promptId, hintId) {
 }
 
 // Build the interactive body (counter + prompt + hint + options) for one item.
-function buildStepBody(item, draft, commit, index, total) {
+// `forward` is invoked after a single-select answer commits (auto-advance).
+function buildStepBody(item, draft, commit, index, total, forward) {
   const stepEl = el('div', 'checklist__step is-active');
   stepEl.dataset.item = item.id;
 
@@ -201,7 +186,7 @@ function buildStepBody(item, draft, commit, index, total) {
   stepEl.appendChild(prompt);
 
   const hintId = promptId + '-hint';
-  const defaultHint = item.multi ? 'Pick any that apply' : 'Pick one';
+  const defaultHint = item.multi ? 'Pick any that apply' : 'Tap an answer to continue';
   const hint = el('p', 'checklist__hint', item.hint || defaultHint);
   hint.id = hintId;
   stepEl.appendChild(hint);
@@ -209,7 +194,7 @@ function buildStepBody(item, draft, commit, index, total) {
   if (item.multi) {
     renderMultiSelect(stepEl, item, draft, commit, promptId, hintId);
   } else {
-    renderSingleChoice(stepEl, item, draft, commit, promptId, hintId);
+    renderSingleChoice(stepEl, item, draft, commit, promptId, hintId, forward);
   }
 
   return stepEl;
@@ -244,7 +229,7 @@ export function renderChecklist(rootEl, draft, onChange) {
     el(
       'p',
       'checklist__intro',
-      'The form already collects the simple choices itself. This quick check just confirms you have what it will ask for — nothing here is typed into the form or sent anywhere.'
+      'Three quick questions — the things people often have not pinned down yet. The form collects everything else itself. Nothing here is typed into the form or sent anywhere.'
     )
   );
 
@@ -327,13 +312,19 @@ export function renderChecklist(rootEl, draft, onChange) {
       new CustomEvent('draft:changed', { detail: { field: 'readiness.' + id, value } })
     );
     updateProgress();
+    // Answering the last crucial item flips the finish gate; refresh the
+    // persistent Next so "Check my readiness →" enables without a repaint. (In
+    // the common path the last tap auto-advances straight to finish, but the
+    // control bar must also be correct if the reader arrives via Back.)
+    if (stepperApi && stepperApi.refreshControls) stepperApi.refreshControls();
   };
 
-  // Evaluate the advisory gate, persist it, and route: pass -> Part 1;
-  // otherwise -> the "gather this first" redirect. Preserves any prior
-  // acknowledgedRedirect so re-running readiness never silently re-locks.
-  // Passed to the stepper only as an opaque finish.onFinish callback
-  // (TRD-5.1/5.13) — stepper.js never sees this routing logic.
+  // Evaluate the advisory gate, persist it, and route to the RESOLUTION screen
+  // in BOTH cases (issue 4: the check always ends with a clear result). The
+  // resolution screen names any gaps and carries the "Begin Part 1 / Continue
+  // anyway" forward action. Preserves any prior acknowledgedRedirect so
+  // re-running readiness never silently re-locks. Passed to the stepper only as
+  // an opaque finish.onFinish callback — stepper.js never sees this routing.
   function finishReadiness() {
     const result = evaluateGate(draft);
     const prev = (draft.readiness && draft.readiness.gate) || {};
@@ -349,7 +340,7 @@ export function renderChecklist(rootEl, draft, onChange) {
       /* best-effort */
     }
     document.dispatchEvent(new CustomEvent('draft:changed'));
-    showScreen(result.passed ? 'part1' : 'redirect');
+    showScreen('redirect');
   }
 
   // painted flips true after the very first paint, so only THAT paint skips
@@ -364,30 +355,12 @@ export function renderChecklist(rootEl, draft, onChange) {
     stepHost.textContent = '';
     if (!total) return;
     const item = items[index];
-    const body = buildStepBody(item, draft, commit, index, ctx.total);
-
-    const nav = el('div', 'checklist__nav');
-
-    const back = el('button', 'checklist__back', '← Back');
-    back.type = 'button';
-    back.disabled = index === 0;
-    back.addEventListener('click', ctx.retreat);
-    nav.appendChild(back);
-
-    if (ctx.isLast) {
-      const finishBtn = el('button', 'checklist__next', 'Check my readiness →');
-      finishBtn.type = 'button';
-      finishBtn.disabled = !readinessCrucialAnswered(draft);
-      finishBtn.addEventListener('click', finishReadiness);
-      nav.appendChild(finishBtn);
-    } else {
-      const next = el('button', 'checklist__next', 'Next →');
-      next.type = 'button';
-      next.addEventListener('click', ctx.advance);
-      nav.appendChild(next);
-    }
-
-    body.appendChild(nav);
+    // Auto-advance target: the last step finishes the check (evaluate + route to
+    // the resolution); every earlier step advances to the next question. No
+    // inline Back/Next — the persistent control bar is the single navigator
+    // (issue 6).
+    const forward = ctx.isLast ? finishReadiness : ctx.advance;
+    const body = buildStepBody(item, draft, commit, index, ctx.total, forward);
     stepHost.appendChild(body);
 
     announce('Step ' + (index + 1) + ' of ' + ctx.total + ': ' + (item.prompt || ''));

@@ -191,7 +191,7 @@ export function renderCheatSheet(draft, idPrefix) {
   const section = el('section', 'cheatsheet');
   section.setAttribute('aria-labelledby', prefix + '-title');
 
-  const title = el('h3', 'cheatsheet__title', 'In the form you will also select:');
+  const title = el('h3', 'cheatsheet__title', 'Before you open the form, be ready to:');
   title.id = prefix + '-title';
   section.appendChild(title);
 
@@ -199,7 +199,7 @@ export function renderCheatSheet(draft, idPrefix) {
     el(
       'p',
       'cheatsheet__note',
-      'These are reminders of what to pick in the form — not text to paste.'
+      'A quick recap of your readiness check — not text to paste.'
     )
   );
 

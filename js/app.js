@@ -19,14 +19,12 @@ import {
   save as saveDraft,
   clear as clearDraft,
 } from './store.js';
-import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
 import { renderRedirect, evaluateGate } from './gate.js';
 import { renderPartHeaders, renderBuilder } from './builders.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
 import { renderSafety, renderSaveControl } from './safety.js';
-import { renderReckoner } from './reckoner.js';
 import { showScreen, setControls } from './router.js';
 import { openModal, closeModal } from './modal.js';
 
@@ -54,101 +52,6 @@ function touch(draft) {
   draft.updatedAt = new Date().toISOString();
 }
 
-// Overwrite the hero's injected figure with the personalised "up to ~S$X" when
-// a numeric estimate exists, else the generic ceiling phrase (TRD-4).
-function updateHeroFigure(draft) {
-  const figure = el('hero-figure');
-  if (!figure) return;
-  const est = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
-  figure.textContent =
-    typeof est === 'number' && isFinite(est) && est > 0
-      ? money.format(est)
-      : money.ceilingPhrase;
-}
-
-// Which Home phase-menu targets are currently reachable. A fresh draft can only
-// enter the Readiness check; the drafting phases (Part 1 / Part 2 / Review) stay
-// locked until the reader has been through the readiness check AND either passed
-// the advisory gate or explicitly chosen to continue past the redirect. This
-// keeps the Home menu consistent with the in-flow gate (TRD-2.4).
-//
-// The pass/fail check itself is LIVE (TRD-5.11): it calls the pure, already-
-// exported evaluateGate(draft) fresh on every call rather than trusting the
-// CACHED gate.passed boolean last written by finishReadiness()/
-// acknowledgeRedirect() — whichever last ran. Without this, editing a
-// previously-answered crucial readiness item (e.g. via a "Checked so far ->
-// Edit" link) in a way that would now fail the gate left gate.passed stale,
-// so the Home menu stayed incorrectly unlocked. gate.evaluated (has the
-// reader run the finish action at least once) and gate.acknowledgedRedirect
-// (a deliberate past choice to continue past a failed gate) both still read
-// from the cached draft.readiness.gate exactly as before — only the pass/fail
-// check becomes live.
-//
-// Scoped ONLY to this Home re-entry gate: it is NOT wired into readiness's
-// stepper finish.isEnabled (js/checklist.js / js/stepper.js), which correctly
-// stays on the narrower readinessCrucialAnswered check, and Part 1/Part 2/
-// Assembly/Transfer's own internal Back/Next and "go to my draft" CTAs never
-// call this function at all — they navigate directly via showScreen(), so a
-// live-failing gate can never strand a user already mid-flow, only relock
-// Home's own menu buttons for RE-ENTRY from Home.
-function menuReachable(draft) {
-  const gate = (draft && draft.readiness && draft.readiness.gate) || {};
-  const readinessComplete = !!(
-    gate.evaluated && (evaluateGate(draft).passed || gate.acknowledgedRedirect)
-  );
-  return {
-    readiness: true,
-    part1: readinessComplete,
-    part2: readinessComplete,
-    transfer: readinessComplete,
-  };
-}
-
-// Reflect reachability on the Home menu: enabled targets are actionable; locked
-// ones are disabled + aria-disabled, and a single hint explains why. Called from
-// both renderAll and the draft:changed path so returning Home after answering
-// shows freshly-unlocked phases.
-function updateMenuGating(draft) {
-  const reach = menuReachable(draft);
-  let anyLocked = false;
-  const items = document.querySelectorAll('.home__menu-item');
-  for (let i = 0; i < items.length; i++) {
-    const btn = items[i];
-    const enabled = !!reach[btn.dataset.target];
-    btn.disabled = !enabled;
-    if (enabled) {
-      btn.removeAttribute('aria-disabled');
-    } else {
-      btn.setAttribute('aria-disabled', 'true');
-      anyLocked = true;
-    }
-  }
-  const hint = el('home-menu-hint');
-  if (hint) hint.hidden = !anyLocked;
-}
-
-// Persist + recompute on band choice, then refresh the hero and dependent
-// sections. recoverableInput holds the raw band id; rewardEstimate is DERIVED
-// and never trusted from storage.
-function handleBand(bandId) {
-  if (!currentDraft.reckoner || typeof currentDraft.reckoner !== 'object') {
-    currentDraft.reckoner = { recoverableInput: '', rewardEstimate: null };
-  }
-  currentDraft.reckoner.recoverableInput = bandId || '';
-  currentDraft.reckoner.rewardEstimate = estimateForBand(bandId);
-  touch(currentDraft);
-  saveDraft(currentDraft);
-
-  const reckonerEl = el('reckoner');
-  if (reckonerEl) {
-    safeRender('reckoner', function () {
-      renderReckoner(reckonerEl, currentDraft, handleBand);
-    });
-  }
-  updateHeroFigure(currentDraft);
-  document.dispatchEvent(new CustomEvent('draft:changed'));
-}
-
 // Re-render only the sections that DERIVE from the mutable answers/overrides:
 // the assembled two-block Review and Transfer Mode. The checklist AND the two
 // free-text builders own their own interactive step state (rendered once in
@@ -169,7 +72,6 @@ function renderDependent() {
       renderTransfer(transferEl, currentDraft);
     });
   }
-  updateMenuGating(currentDraft);
 }
 
 // Called by the readiness check for each answered item. Fields prefixed
@@ -220,25 +122,21 @@ function acknowledgeRedirect() {
   currentDraft.readiness.gate.acknowledgedRedirect = true;
   touch(currentDraft);
   saveDraft(currentDraft);
-  updateMenuGating(currentDraft);
   showScreen('part1');
 }
 
-// Paint the dynamic "gather this first" redirect body (naming the thin crucial
-// group) and mirror its "Continue anyway" onto the persistent Next control.
+// Paint the readiness RESOLUTION screen (ready vs. gaps) and label the
+// persistent Next as the forward action: "Begin Part 1 →" when ready, or
+// "Continue anyway →" when there are gaps. Both proceed via acknowledgeRedirect.
 function renderRedirectScreen() {
   const screen = el('screen-redirect');
   if (!screen) return;
   safeRender('redirect', function () {
-    renderRedirect(screen, currentDraft, {
-      onContinue: acknowledgeRedirect,
-      onBackToMenu: function () {
-        showScreen('home');
-      },
-    });
+    renderRedirect(screen, currentDraft);
   });
+  const passed = evaluateGate(currentDraft).passed;
   setControls({
-    next: { label: 'Continue anyway →' },
+    next: { label: passed ? 'Begin Part 1 →' : 'Continue anyway →' },
     onNext: acknowledgeRedirect,
   });
 }
@@ -313,14 +211,6 @@ function openSafetyModal() {
 export function renderAll(draft) {
   currentDraft = draft || createEmptyDraft();
 
-  const reckonerEl = el('reckoner');
-  if (reckonerEl) {
-    safeRender('reckoner', function () {
-      renderReckoner(reckonerEl, currentDraft, handleBand);
-    });
-  }
-  updateHeroFigure(currentDraft);
-
   const checklistEl = el('checklist');
   if (checklistEl) {
     safeRender('checklist', function () {
@@ -371,14 +261,6 @@ function boot() {
   // schema and respects the persistence gate, so this is always a valid draft.
   currentDraft = loadDraft();
 
-  // rewardEstimate is derived and deliberately nulled by normalizeDraft; recompute
-  // it from the persisted band id before first paint so the hero personalises.
-  if (currentDraft.reckoner) {
-    currentDraft.reckoner.rewardEstimate = estimateForBand(
-      currentDraft.reckoner.recoverableInput
-    );
-  }
-
   renderAll(currentDraft);
 
   // Home's quiet Privacy link opens the full safety panel as an accessible
@@ -386,19 +268,23 @@ function boot() {
   const privacyBtn = el('home-privacy');
   if (privacyBtn) privacyBtn.addEventListener('click', openSafetyModal);
 
-  // Any section that mutates the draft (checklist, draft edits, and the
-  // standalone reckoner) dispatches 'draft:changed' on document. Re-render the
-  // dependent sections only, so we never clobber active tap/focus state.
+  // Any section that mutates the draft (checklist, draft edits) dispatches
+  // 'draft:changed' on document. Re-render the dependent sections only, so we
+  // never clobber active tap/focus state.
   document.addEventListener('draft:changed', function () {
     renderDependent();
   });
 
-  // The redirect screen's body depends on the live gate result, so (re)paint it
-  // on entry. Fired by the router after it applies the default control bar, so
-  // renderRedirectScreen's setControls override wins.
+  // Some screens override the control bar on entry (fired by the router AFTER it
+  // applies the default bar, so these overrides win):
+  //   - redirect (readiness resolution): dynamic forward label + live body.
+  //   - intro2 (Part 2 breather): relabel Next to "Begin Part 2 →".
   document.addEventListener('screen:changed', function (e) {
-    if (e && e.detail && e.detail.name === 'redirect') {
+    if (!e || !e.detail) return;
+    if (e.detail.name === 'redirect') {
       renderRedirectScreen();
+    } else if (e.detail.name === 'intro2') {
+      setControls({ next: { label: 'Begin Part 2 →' } });
     }
   });
 }

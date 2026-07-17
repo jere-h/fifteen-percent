@@ -67,19 +67,11 @@ export const ANSWER_FIELDS = [
   'identifyForReward',
 ];
 
-// The readiness item ids the advisory gate treats as crucial (js/gate.js reads
-// these). The three vision groups map: who → reportingOn + identityDetails,
-// what → taxTypes + behaviours, how → relationship + evidence. Kept here so the
-// gate, the "Next disabled until crucial answered" rule, and the model stay in
-// sync from one source.
-export const READINESS_CRUCIAL = [
-  'reportingOn',
-  'identityDetails',
-  'taxTypes',
-  'behaviours',
-  'evidence',
-  'relationship',
-];
+// The readiness item ids the advisory gate treats as crucial, one per vision
+// group: who → whoKnown, what → whatKnown, how → howKnown. The live gate reads
+// this from js/data.js `readiness.items` (each carries `crucial`); this list is
+// kept only as documentation of the three groups.
+export const READINESS_CRUCIAL = ['whoKnown', 'whatKnown', 'howKnown'];
 
 // Pure: how many of the seven checklist fields are answered. A string answer
 // counts when non-empty; evidenceInHand (an array) counts when it has at least
