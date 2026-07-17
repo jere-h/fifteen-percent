@@ -351,9 +351,16 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   wizard.appendChild(stepHost);
   cols.appendChild(wizard);
 
-  // Live preview of the growing block.
+  // Live preview of the growing block — a read-only "document" the app writes.
   const preview = el('div', 'builder__preview');
-  preview.appendChild(el('p', 'builder__preview-label', 'Your paste-ready text so far'));
+  preview.appendChild(el('p', 'builder__preview-label', 'Your paste-ready text — read-only'));
+  preview.appendChild(
+    el(
+      'p',
+      'builder__preview-note',
+      'The app writes this as you tap. You’ll copy it into the form at the end — no need to type here.'
+    )
+  );
   const previewText = el('p', 'builder__preview-text');
   previewText.setAttribute('role', 'status');
   previewText.setAttribute('aria-live', 'off');
