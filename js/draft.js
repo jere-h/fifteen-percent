@@ -278,7 +278,7 @@ export function renderDraft(rootEl, draft, onEdit) {
       el(
         'p',
         'draft__note',
-        'Tap a block to reword it. Your edits are kept and used when you copy into the form.'
+        'Tap a block to reword it — your edits are kept.'
       )
     );
 

@@ -30,8 +30,9 @@ const NEXT_SCREEN = { ft1: 'intro2', ft2: 'assembly' };
 
 // ---------------------------------------------------------------- Part headers
 
-// Apply one Part's name + estimate to its static <h2 tabindex="-1"> heading and
-// restate the estimate in a small .part__timebox line beneath it.
+// Apply one Part's name + estimate to its static <h2 tabindex="-1"> heading,
+// e.g. "Part 1: What happened — ~5 mins". The time lives in the heading itself,
+// so there is no separate description line beneath it.
 function applyPart(key) {
   const cfg = parts && parts[key];
   if (!cfg) return;
@@ -39,12 +40,6 @@ function applyPart(key) {
   const heading = document.getElementById(key + '-heading');
   if (heading) {
     heading.textContent = cfg.name + ' — ' + cfg.estimate;
-  }
-
-  const timebox = document.getElementById(key + '-timebox');
-  if (timebox) {
-    const mins = String(cfg.estimate || '').replace(/[~]/g, '').trim();
-    timebox.textContent = 'About ' + mins + ' — tap to choose, the app writes the words.';
   }
 }
 
