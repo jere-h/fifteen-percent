@@ -89,6 +89,19 @@ export function openModal(opts) {
   dialogEl.setAttribute('aria-modal', 'true');
   if (o.titleId) dialogEl.setAttribute('aria-labelledby', o.titleId);
 
+  // An always-visible Close control so the dialog is never a dead end — ESC and
+  // backdrop-tap are not discoverable, especially on touch. First in the dialog
+  // so it is the first Tab stop, and part of the focus trap.
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'modal__close';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.textContent = '×'; // ×
+  closeBtn.addEventListener('click', function () {
+    closeModal();
+  });
+  dialogEl.appendChild(closeBtn);
+
   dialogEl.appendChild(contentEl);
   backdropEl.appendChild(dialogEl);
   document.body.appendChild(backdropEl);
