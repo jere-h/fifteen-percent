@@ -153,7 +153,7 @@ textarea {
    <= viewport height on every screen (TRD-1.1) — and the persistent control bar
    stays visible at the bottom without relying on sticky positioning. */
 #app {
-  max-width: min(100%, 1120px);
+  max-width: min(100%, 1400px);
   margin: 0 auto;
   height: 100vh;
   height: 100dvh;
@@ -1122,7 +1122,9 @@ p {
 }
 
 /* Prompts + live preview: stacked on mobile, side by side on desktop (issue 5).
-   The preview sticks so it stays in view while the prompt options scroll. */
+   On desktop the preview is a WIDE reference panel that stays put — it sticks to
+   the top and scrolls within itself, so it sits effectively outside the page's
+   scroll area while the prompts on the left scroll. */
 .builder__cols {
   display: flex;
   flex-direction: column;
@@ -1132,14 +1134,16 @@ p {
 @media (min-width: 720px) {
   .builder__cols {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
-    gap: var(--space-5);
+    grid-template-columns: minmax(0, 1fr) clamp(360px, 36%, 500px);
+    gap: var(--space-6);
     align-items: start;
   }
 
   .builder__cols .builder__preview {
     position: sticky;
     top: 0;
+    max-height: calc(100dvh - 8rem);
+    overflow-y: auto;
   }
 }
 
@@ -1159,15 +1163,18 @@ p {
   display: none;
 }
 
-/* Live preview of the growing paste-ready block. */
+/* Live preview of the growing paste-ready block. Styled as a "document" — a
+   distinct sand/paper background, a serif body and a read-only label — so it
+   reads clearly as generated output the app writes, never a field you type in. */
 .builder__preview {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent-strong);
   border-radius: var(--radius);
-  background: var(--color-surface);
+  background: var(--color-sand);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .builder__preview-label {
@@ -1175,14 +1182,22 @@ p {
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: .1em;
-  font-size: 1rem;
+  font-size: .9rem;
+  color: var(--color-muted);
+}
+
+.builder__preview-note {
+  margin: 0 0 var(--space-2);
+  font-size: .9rem;
+  line-height: 1.4;
   color: var(--color-muted);
 }
 
 .builder__preview-text {
   margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.7;
+  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  font-size: 1.15rem;
+  line-height: 1.8;
   color: var(--color-fg);
   overflow-wrap: anywhere;
 }
