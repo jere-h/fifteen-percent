@@ -1,12 +1,13 @@
 // stepper.js — shared, domain-generic stepper for one-prompt-per-screen flows
-// (the readiness check + the two free-text builders), unifying how a screen's
-// own inline Back/Next buttons and the persistent Back/Menu/Next control bar
-// talk to the SAME advance/retreat logic (TRD-5.1).
+// (the readiness check + the two free-text builders). Steps no longer draw
+// their own inline Back/Next; the persistent Back/Menu/Next control bar is the
+// single navigator, and this module drives BOTH of its ends from the SAME
+// advance/retreat logic (TRD-5.1).
 //
 // This module owns ONLY: the active step index, and wiring the persistent
-// control bar (via router.js's setControls/clearControls) so it always calls
-// literally the same advance/retreat function references a host's own inline
-// Next/Back buttons use. It contains ZERO readiness/IRAS-specific knowledge —
+// control bar (via router.js's setControls) so its Back/Next call the same
+// advance/retreat references throughout. It contains ZERO readiness/IRAS-
+// specific knowledge —
 // no import from js/gate.js or js/data.js, no branching on any domain concept
 // (TRD-5.13). All pass/fail routing, gate evaluation, and prompt-tree content
 // stay inside the host modules (js/checklist.js, js/builders.js); stepper.js
@@ -25,7 +26,7 @@
 //                      on every paint, including the very first. `goTo` /
 //                      `advance` / `retreat` are the SAME function references
 //                      the persistent bar's Next/Back use on that step, so a
-//                      host builds its inline buttons from them directly.
+//                      host can trigger navigation (e.g. auto-advance) with them.
 //   onIndexChange(index) - fires right after activeIndex changes, BEFORE the
 //                    paint (before renderStep runs) — for a host's own
 //                    per-render bookkeeping that does not belong inside the
@@ -35,17 +36,16 @@
 //   finish?        - {label, isEnabled(), onFinish} — last-step-only "finish"
 //                    behaviour for the persistent Next (e.g. evaluate a gate
 //                    and route elsewhere). Omit for a screen whose last step
-//                    should fall back to the plain FLOW-derived Next
-//                    (router.clearControls()).
+//                    should fall through to the FLOW-derived next screen.
 //
-// Every step except the last: the persistent Next reads "Next →" and calls
-// the exact same `advance` reference as any inline Next button the host
-// wires up in renderStep. On the last step: `finish` present -> persistent
-// Next reads finish.label, is disabled unless finish.isEnabled(), and calls
-// finish.onFinish; `finish` absent -> router.clearControls() so the screen's
-// plain FLOW-derived Back/Menu/Next takes back over.
+// Back: retreats to the previous step, except on the first step where it clears
+// its override (undefined) so the router's FLOW-derived previous SCREEN applies.
+// Next: on any step but the last it reads "Next →" and calls `advance`. On the
+// last step: `finish` present -> reads finish.label, disabled unless
+// finish.isEnabled(), calls finish.onFinish; `finish` absent -> cleared
+// (undefined) so the FLOW-derived next screen applies.
 
-import { setControls, clearControls, getScreen } from './router.js';
+import { setControls, getScreen } from './router.js';
 
 // One document-level 'screen:changed' listener per screenName (not per
 // createStepper call), so re-rendering a screen's stepper (e.g. after the
@@ -69,19 +69,40 @@ export function createStepper(config) {
 
   let activeIndex = clamp(typeof cfg.firstIndex === 'number' ? cfg.firstIndex : 0);
 
+  // Drive BOTH ends of the persistent control bar for the current step, so the
+  // bar is the single navigator now that steps have no inline Back/Next
+  // (issues 6 & 8). Back retreats to the previous step, except on the first step
+  // where it falls through to the FLOW-derived previous SCREEN. Next advances to
+  // the next step, runs the finish action on the last step (when configured), or
+  // falls through to the FLOW-derived next SCREEN on a last step with no finish.
+  // Passing `undefined` for a side clears any prior override so the router's
+  // FLOW default takes over for that side.
   function applyStepControls() {
     if (getScreen() !== screenName) return;
+    const isFirst = activeIndex === 0;
     const isLast = activeIndex === total - 1;
-    if (!isLast) {
-      setControls({ next: { label: 'Next →' }, onNext: advance });
-    } else if (finish) {
-      setControls({
-        next: { label: finish.label, disabled: !finish.isEnabled() },
-        onNext: finish.onFinish,
-      });
+
+    const controls = {};
+    if (!isFirst) {
+      controls.back = { label: '← Back', disabled: false };
+      controls.onBack = retreat;
     } else {
-      clearControls();
+      controls.back = undefined; // first step: FLOW prev screen
+      controls.onBack = undefined;
     }
+
+    if (!isLast) {
+      controls.next = { label: 'Next →' };
+      controls.onNext = advance;
+    } else if (finish) {
+      controls.next = { label: finish.label, disabled: !finish.isEnabled() };
+      controls.onNext = finish.onFinish;
+    } else {
+      controls.next = undefined; // last step, no finish: FLOW next screen
+      controls.onNext = undefined;
+    }
+
+    setControls(controls);
   }
 
   function paint() {

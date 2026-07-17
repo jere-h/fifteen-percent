@@ -1247,6 +1247,14 @@ p {
   display: none;
 }
 
+/* The jog "more options" sub-page (issue 8): a left accent marks it as a
+   drill-in from the previous screen, distinct from a top-level prompt. */
+.builder__jog-step {
+  border-left: 3px solid var(--color-accent-strong);
+  padding-left: var(--space-4);
+  margin-left: 2px;
+}
+
 .builder__jog-title {
   margin: 0;
   font-size: 1rem;

@@ -13,12 +13,9 @@
 // Public API:
 //   showScreen(name, { focus })   -> void   (focus defaults to true)
 //   getScreen()                   -> string
-//   setControls({ back, next, onBack, onNext }) -> void  (per-screen override)
-//   clearControls()               -> void   (TRD-5.2: a REAL reset — discards
-//                                    any active override so the control bar
-//                                    falls back entirely to the plain
-//                                    FLOW-derived Back/Menu/Next; distinct from
-//                                    the no-op setControls(null))
+//   setControls({ back, next, onBack, onNext }) -> void  (per-screen override;
+//                                    pass a side as `undefined` to clear that
+//                                    side's override back to the FLOW default)
 
 // Canonical order. 'redirect' is the readiness RESOLUTION screen: the gate
 // routes to it explicitly after the check and it leads into Part 1. 'intro2' is
@@ -198,17 +195,6 @@ export function getScreen() {
  */
 export function setControls(next) {
   overrides = Object.assign({}, overrides || {}, next || {});
-  applyControls();
-}
-
-/**
- * Discard any active per-screen control override and re-apply the plain
- * FLOW-derived Back/Menu/Next for the current screen (TRD-5.2). This is a
- * REAL reset — distinct from setControls(null), which merges {} onto whatever
- * `overrides` already held and therefore changes nothing.
- */
-export function clearControls() {
-  overrides = null;
   applyControls();
 }
 

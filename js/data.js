@@ -315,48 +315,37 @@ export const freeTextBuilders = {
         ],
       },
       {
+        // One clean, non-overlapping set of amount bands (issue 7). The old
+        // "I can give a rough figure" reveal duplicated these same bands, so it
+        // is gone; a rough band IS the answer here.
         id: "amounts",
-        prompt: "Do you know the amounts or how often it happened?",
-        hint: "A rough sense is fine; exact figures are not needed.",
+        prompt: "Roughly how much was involved, if you know?",
+        hint: "A rough band is fine — exact figures are not needed. Pick “I don't know” to skip.",
         sentence: (f) => "On scale, " + f + ".",
         options: [
           {
-            label: "Small — low thousands",
-            fragment: "the sums involved appear to be in the low thousands",
+            label: "A few thousand dollars",
+            fragment: "the amount involved appears to be a few thousand dollars",
           },
           {
-            label: "Moderate — tens of thousands",
-            fragment: "the sums involved appear to run into the tens of thousands",
+            label: "Tens of thousands",
+            fragment: "the amount involved appears to run into the tens of thousands",
           },
           {
-            label: "Large — over a hundred thousand",
+            label: "Around a hundred thousand",
             fragment:
-              "the sums involved appear to exceed a hundred thousand dollars",
+              "the amount involved appears to be around a hundred thousand dollars",
           },
           {
-            label: "It happens repeatedly",
-            fragment: "it appears to happen repeatedly rather than only once",
+            label: "Several hundred thousand or more",
+            fragment:
+              "the amount involved appears to be several hundred thousand dollars or more",
           },
-          { label: "I don't know the amounts", omitIfUnrefined: true },
           {
-            label: "I can give a rough figure",
-            unsure: true,
-            jog: [
-              {
-                label: "Around a few thousand dollars",
-                fragment: "the amount appears to be around a few thousand dollars",
-              },
-              {
-                label: "Around tens of thousands",
-                fragment: "the amount appears to be in the tens of thousands",
-              },
-              {
-                label: "Six figures or more",
-                fragment: "the amount appears to be six figures or more",
-              },
-              { label: "Other — type it myself", manual: true },
-            ],
+            label: "It happened repeatedly",
+            fragment: "it appears to have happened repeatedly rather than only once",
           },
+          { label: "I don't know the amount", omitIfUnrefined: true },
         ],
       },
       {
