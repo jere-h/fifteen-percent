@@ -1660,17 +1660,6 @@ body.modal-open {
   }
 }
 
-/* ------------------------------------------------- Part timebox (TRD-2.5) */
-/* Real, visible AA-contrast text restating a Part's honest time estimate under
-   its heading — never a title-only attribute. */
-.part__timebox {
-  margin: calc(var(--space-2) * -1) 0 0;
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  letter-spacing: .02em;
-  color: var(--color-muted);
-}
-
 /* --------------------------------------------- Redirect screen (TRD-2.4) */
 /* The advisory "gather this first" screen. Procedural only — names what to
    collect, never characterises conduct or predicts an outcome. */

@@ -216,20 +216,17 @@ export function renderChecklist(rootEl, draft, onChange) {
   const total = items.length;
   const part = (readiness && readiness.part) || { name: 'Part 0: Readiness', estimate: '~3 mins' };
 
-  // --- timeboxed header (single-sourced from data.js) --------------------
-  rootEl.appendChild(el('p', 'eyebrow', 'Readiness check'));
+  // --- heading (name + estimate, single-sourced from data.js) ------------
+  // The time lives in the heading; no separate description line beneath it.
   const heading = el('h2', null, part.name + ' — ' + part.estimate);
   heading.id = 'checklist-heading';
   heading.tabIndex = -1; // focus target on screen switch (router)
   rootEl.appendChild(heading);
   rootEl.appendChild(
-    el('p', 'part__timebox', 'About ' + part.estimate.replace(/[~]/g, '').trim() + ' — you tap, you don’t type.')
-  );
-  rootEl.appendChild(
     el(
       'p',
       'checklist__intro',
-      'Three quick questions — the things people often have not pinned down yet. The form collects everything else itself. Nothing here is typed into the form or sent anywhere.'
+      'The things people often haven’t sorted out before they file.'
     )
   );
 
