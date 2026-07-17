@@ -1435,7 +1435,12 @@ body.modal-open {
   cursor: pointer;
 }
 
-.checklist__step-counter {
+/* Rename-only (TRD-5.9): was the single shared `.checklist__step-counter`
+   used identically by both contexts; now selected by each context's own
+   class name (readiness__… / builder__…, matching the codebase's existing
+   naming convention) with byte-identical properties. */
+.readiness__step-counter,
+.builder__step-counter {
   margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -1584,7 +1589,11 @@ body.modal-open {
   padding: var(--space-2) var(--space-4);
 }
 
-.transfer__empty-summary {
+/* TRD-5.6: Home's phase-menu disclosure reuses this existing sizing rule
+   (pure additional-selector reuse, properties unchanged) rather than new
+   hand-authored CSS. */
+.transfer__empty-summary,
+.home__menu-summary {
   list-style: none;
   cursor: pointer;
   min-height: 44px;
@@ -1594,7 +1603,8 @@ body.modal-open {
   color: var(--color-muted);
 }
 
-.transfer__empty-summary::-webkit-details-marker {
+.transfer__empty-summary::-webkit-details-marker,
+.home__menu-summary::-webkit-details-marker {
   display: none;
 }
 

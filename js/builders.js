@@ -18,8 +18,9 @@
 // and dispatches 'draft:changed'.
 
 import { freeTextBuilders, parts } from './data.js';
-import { buildNarrative } from './draft.js';
+import { buildNarrative, normalizeFragment } from './draft.js';
 import * as store from './store.js';
+import { createStepper } from './stepper.js';
 
 // ---------------------------------------------------------------- Part headers
 
@@ -108,7 +109,7 @@ function buildPromptBody(cfg, prompt, index, total, answers, commit) {
   stepEl.dataset.prompt = prompt.id;
 
   stepEl.appendChild(
-    el('p', 'checklist__step-counter', 'Prompt ' + (index + 1) + ' of ' + total)
+    el('p', 'builder__step-counter', 'Prompt ' + (index + 1) + ' of ' + total)
   );
 
   const promptId = 'builder-prompt-' + cfg.key + '-' + prompt.id;
@@ -345,7 +346,12 @@ function buildJog(prompt, unsure, answers, commit, labelledById, afterChange) {
     manualInput.hidden = !manualActive;
 
     const commitManual = () => {
-      const text = String(manualInput.value || '').replace(/\s+$/, '').trim();
+      // Normalized (TRD-5.5): trimmed, trailing .!? stripped, first letter
+      // lowercased UNLESS the text starts with the pronoun "I" — several
+      // authored jog/option fragments for this exact prompt already start
+      // with a capitalised "I" (see js/draft.js's normalizeFragment doc), so a
+      // manual entry must never be lowercased into "i …".
+      const text = normalizeFragment(manualInput.value);
       manualActive = true;
       commit(prompt.id, text === '' ? null : text);
       refreshJog();
@@ -432,8 +438,6 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     return Math.max(0, total - 1);
   }
 
-  let activeIndex = firstUnansweredIndex();
-
   function updateProgress() {
     const n = answeredCount();
     progress.textContent = '';
@@ -458,7 +462,11 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     }
   }
 
-  function renderSummaries() {
+  // stepperApi is assigned once createStepper() below returns; the "Edit"
+  // links built here only run later, on click, by which time it is assigned.
+  let stepperApi = null;
+
+  function renderSummaries(activeIndex) {
     summariesEl.textContent = '';
     const done = prompts
       .map((prompt, i) => ({ prompt, i }))
@@ -482,7 +490,9 @@ export function renderBuilder(rootEl, draft, key, onChange) {
       const edit = el('button', 'checklist__edit', 'Edit');
       edit.type = 'button';
       edit.setAttribute('aria-label', 'Edit your answer to: ' + prompt.prompt);
-      edit.addEventListener('click', () => goTo(i, true));
+      edit.addEventListener('click', () => {
+        if (stepperApi) stepperApi.goTo(i);
+      });
       row.appendChild(edit);
 
       summariesEl.appendChild(row);
@@ -508,31 +518,33 @@ export function renderBuilder(rootEl, draft, key, onChange) {
       })
     );
     updateProgress();
-    renderSummaries();
     updatePreview();
   };
 
-  function paintActive(focusIt) {
+  // painted flips true after the very first paint, so only THAT paint skips
+  // moving focus (mirrors the old paintActive(focusIt) contract).
+  let painted = false;
+
+  function renderStep(index, ctx) {
+    const focusIt = painted;
+    painted = true;
+
     stepHost.textContent = '';
     if (!total) return;
-    const prompt = prompts[activeIndex];
-    const body = buildPromptBody(cfg, prompt, activeIndex, total, answers, commit);
+    const prompt = prompts[index];
+    const body = buildPromptBody(cfg, prompt, index, ctx.total, answers, commit);
 
     const nav = el('div', 'checklist__nav');
     const back = el('button', 'checklist__back', '← Previous');
     back.type = 'button';
-    back.disabled = activeIndex === 0;
-    back.addEventListener('click', () => goTo(activeIndex - 1, true));
+    back.disabled = index === 0;
+    back.addEventListener('click', ctx.retreat);
     nav.appendChild(back);
 
-    if (activeIndex < total - 1) {
-      const next = el(
-        'button',
-        'checklist__next',
-        'Next prompt — ' + (activeIndex + 2) + ' of ' + total + ' →'
-      );
+    if (!ctx.isLast) {
+      const next = el('button', 'checklist__next', 'Next →');
       next.type = 'button';
-      next.addEventListener('click', () => goTo(activeIndex + 1, true));
+      next.addEventListener('click', ctx.advance);
       nav.appendChild(next);
     } else {
       const doneNote = el(
@@ -546,7 +558,7 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     body.appendChild(nav);
     stepHost.appendChild(body);
 
-    announce('Prompt ' + (activeIndex + 1) + ' of ' + total + ': ' + (prompt.prompt || ''));
+    announce('Prompt ' + (index + 1) + ' of ' + ctx.total + ': ' + (prompt.prompt || ''));
 
     if (focusIt) {
       const p = body.querySelector('.checklist__prompt');
@@ -555,12 +567,6 @@ export function renderBuilder(rootEl, draft, key, onChange) {
         p.focus();
       }
     }
-  }
-
-  function goTo(index, focusIt) {
-    activeIndex = Math.min(Math.max(index, 0), Math.max(0, total - 1));
-    renderSummaries();
-    paintActive(focusIt);
   }
 
   // Keep the live preview honest when the block changes OFF this screen — e.g. a
@@ -576,6 +582,16 @@ export function renderBuilder(rootEl, draft, key, onChange) {
 
   updateProgress();
   updatePreview();
-  renderSummaries();
-  paintActive(false);
+
+  // Part 1 / Part 2 pass no `finish` config: their last prompt has no inline
+  // Next (see renderStep above) and the persistent bar falls back to the
+  // plain FLOW-derived Next (router.clearControls(), inside stepper.js) —
+  // only tapping it on the last prompt moves on to the next screen.
+  stepperApi = createStepper({
+    screenName: key === 'ft1' ? 'part1' : 'part2',
+    total: total,
+    firstIndex: firstUnansweredIndex(),
+    renderStep: renderStep,
+    onIndexChange: renderSummaries,
+  });
 }

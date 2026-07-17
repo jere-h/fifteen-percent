@@ -21,12 +21,8 @@ import {
   evaluateGate,
 } from './gate.js';
 import * as store from './store.js';
-import { showScreen, setControls, getScreen } from './router.js';
-
-// Latest control-applier closure (over the current draft) + a once-only listener
-// so re-renders never stack duplicate 'screen:changed' handlers.
-let applyReadinessControls = null;
-let listenerBound = false;
+import { showScreen } from './router.js';
+import { createStepper } from './stepper.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -196,7 +192,7 @@ function buildStepBody(item, draft, commit, index, total) {
   stepEl.dataset.item = item.id;
 
   stepEl.appendChild(
-    el('p', 'checklist__step-counter', 'Step ' + (index + 1) + ' of ' + total)
+    el('p', 'readiness__step-counter', 'Step ' + (index + 1) + ' of ' + total)
   );
 
   const promptId = 'readiness-prompt-' + item.id;
@@ -271,8 +267,6 @@ export function renderChecklist(rootEl, draft, onChange) {
     return Math.max(0, total - 1);
   }
 
-  let activeIndex = firstUnansweredIndex();
-
   function updateProgress() {
     const n = answeredReadinessCount(draft);
     progress.textContent = '';
@@ -284,7 +278,11 @@ export function renderChecklist(rootEl, draft, onChange) {
     );
   }
 
-  function renderSummaries() {
+  // stepperApi is assigned once createStepper() below returns; the "Edit" links
+  // built here only run later, on click, by which time it is always assigned.
+  let stepperApi = null;
+
+  function renderSummaries(activeIndex) {
     summariesEl.textContent = '';
     const answered = items
       .map((item, i) => ({ item, i }))
@@ -307,7 +305,9 @@ export function renderChecklist(rootEl, draft, onChange) {
       const edit = el('button', 'checklist__edit', 'Edit');
       edit.type = 'button';
       edit.setAttribute('aria-label', 'Edit your answer to: ' + item.prompt);
-      edit.addEventListener('click', () => goTo(i, true));
+      edit.addEventListener('click', () => {
+        if (stepperApi) stepperApi.goTo(i);
+      });
       row.appendChild(edit);
 
       summariesEl.appendChild(row);
@@ -327,13 +327,13 @@ export function renderChecklist(rootEl, draft, onChange) {
       new CustomEvent('draft:changed', { detail: { field: 'readiness.' + id, value } })
     );
     updateProgress();
-    renderSummaries();
-    if (applyReadinessControls) applyReadinessControls();
   };
 
   // Evaluate the advisory gate, persist it, and route: pass -> Part 1;
   // otherwise -> the "gather this first" redirect. Preserves any prior
   // acknowledgedRedirect so re-running readiness never silently re-locks.
+  // Passed to the stepper only as an opaque finish.onFinish callback
+  // (TRD-5.1/5.13) — stepper.js never sees this routing logic.
   function finishReadiness() {
     const result = evaluateGate(draft);
     const prev = (draft.readiness && draft.readiness.gate) || {};
@@ -352,42 +352,45 @@ export function renderChecklist(rootEl, draft, onChange) {
     showScreen(result.passed ? 'part1' : 'redirect');
   }
 
-  function paintActive(focusIt) {
+  // painted flips true after the very first paint, so only THAT paint skips
+  // moving focus (mirrors the old paintActive(focusIt) contract: false on
+  // initial render, true on every subsequent goTo/advance/retreat).
+  let painted = false;
+
+  function renderStep(index, ctx) {
+    const focusIt = painted;
+    painted = true;
+
     stepHost.textContent = '';
     if (!total) return;
-    const item = items[activeIndex];
-    const body = buildStepBody(item, draft, commit, activeIndex, total);
+    const item = items[index];
+    const body = buildStepBody(item, draft, commit, index, ctx.total);
 
     const nav = el('div', 'checklist__nav');
 
     const back = el('button', 'checklist__back', '← Back');
     back.type = 'button';
-    back.disabled = activeIndex === 0;
-    back.addEventListener('click', () => goTo(activeIndex - 1, true));
+    back.disabled = index === 0;
+    back.addEventListener('click', ctx.retreat);
     nav.appendChild(back);
 
-    const isLast = activeIndex === total - 1;
-    if (isLast) {
-      const finish = el('button', 'checklist__next', 'Check my readiness →');
-      finish.type = 'button';
-      finish.disabled = !readinessCrucialAnswered(draft);
-      finish.addEventListener('click', finishReadiness);
-      nav.appendChild(finish);
+    if (ctx.isLast) {
+      const finishBtn = el('button', 'checklist__next', 'Check my readiness →');
+      finishBtn.type = 'button';
+      finishBtn.disabled = !readinessCrucialAnswered(draft);
+      finishBtn.addEventListener('click', finishReadiness);
+      nav.appendChild(finishBtn);
     } else {
-      const next = el(
-        'button',
-        'checklist__next',
-        'Next — ' + (activeIndex + 2) + ' of ' + total + ' →'
-      );
+      const next = el('button', 'checklist__next', 'Next →');
       next.type = 'button';
-      next.addEventListener('click', () => goTo(activeIndex + 1, true));
+      next.addEventListener('click', ctx.advance);
       nav.appendChild(next);
     }
 
     body.appendChild(nav);
     stepHost.appendChild(body);
 
-    announce('Step ' + (activeIndex + 1) + ' of ' + total + ': ' + (item.prompt || ''));
+    announce('Step ' + (index + 1) + ' of ' + ctx.total + ': ' + (item.prompt || ''));
 
     if (focusIt) {
       const prompt = body.querySelector('.checklist__prompt');
@@ -398,38 +401,18 @@ export function renderChecklist(rootEl, draft, onChange) {
     }
   }
 
-  function goTo(index, focusIt) {
-    activeIndex = Math.min(Math.max(index, 0), Math.max(0, total - 1));
-    renderSummaries();
-    paintActive(focusIt);
-  }
-
-  // Persistent control bar: on the readiness screen the Next control finishes
-  // the check (evaluate gate -> route) and stays disabled until every crucial
-  // item has an answer. Guarded so an off-screen (boot) render never clobbers
-  // another screen's controls.
-  applyReadinessControls = function () {
-    if (getScreen() !== 'readiness') return;
-    setControls({
-      next: {
-        label: 'Check my readiness →',
-        disabled: !readinessCrucialAnswered(draft),
-      },
-      onNext: finishReadiness,
-    });
-  };
-
-  if (!listenerBound) {
-    listenerBound = true;
-    document.addEventListener('screen:changed', function (e) {
-      if (e && e.detail && e.detail.name === 'readiness' && applyReadinessControls) {
-        applyReadinessControls();
-      }
-    });
-  }
-
   updateProgress();
-  renderSummaries();
-  paintActive(false);
-  applyReadinessControls();
+
+  stepperApi = createStepper({
+    screenName: 'readiness',
+    total: total,
+    firstIndex: firstUnansweredIndex(),
+    renderStep: renderStep,
+    onIndexChange: renderSummaries,
+    finish: {
+      label: 'Check my readiness →',
+      isEnabled: () => readinessCrucialAnswered(draft),
+      onFinish: finishReadiness,
+    },
+  });
 }

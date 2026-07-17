@@ -159,6 +159,17 @@ export const readiness = {
       ],
     },
     {
+      // Intentional override (TRD-5.10): unlike every other `kind:'verify'`
+      // item (which omits `options` and falls back to the generic
+      // optionsFor() triple "I have this" / "Not sure" / "No"), this item
+      // supplies its own three labels because a yes/no HISTORY question
+      // ("have you already reported this before?") reads better as
+      // "Yes, already reported" / "No, not yet" than the generic verify
+      // triple. The underlying stored value tokens are unchanged from the
+      // standard verify-item contract: optionsFor() still maps these 3
+      // custom labels to the same canonical have/unsure/no values by index
+      // (checklist.js's optionsFor), so cheatsheet.js's buildCheatSheet
+      // ("Reported this to IRAS before" row) keeps working unchanged.
       id: "priorIras",
       kind: "verify",
       prompt: "Have you already reported this to IRAS before?",

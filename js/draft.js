@@ -46,6 +46,31 @@ function destrandFirst(sentence) {
   return stripped.charAt(0).toUpperCase() + stripped.slice(1);
 }
 
+// normalizeFragment (TRD-5.5): normalizes a raw, user-typed "Other — type it
+// myself" manual entry so it splices cleanly into a sentence() template the
+// same way every hand-authored `fragment` in data.js already does — trimmed,
+// trailing .!? stripped, first letter lowercased. The ONE exception is
+// mandatory, not cosmetic: a fragment that starts with the pronoun "I"
+// (/^I\b/) is left exactly as typed. Several authored FT-2 `howKnown`
+// fragments legitimately start with a capitalised "I" ("I saw it happen
+// myself", "I handled the records or money involved", jog entry "I
+// overheard it being discussed") because that prompt's sentence() template
+// is "I know about it because " + f + "." — splicing in a lowercased "i"
+// there would be a new, visible grammar bug in text meant to be pasted
+// straight into a government form. `leadsSentence` is kept for API
+// completeness for a future caller whose fragment opens its own sentence;
+// every current sentence() template places its fragment argument
+// mid-sentence, so builders.js's one call site always uses the default
+// leadsSentence:false.
+export function normalizeFragment(raw, { leadsSentence = false } = {}) {
+  let s = String(raw == null ? '' : raw).trim();
+  s = s.replace(/[.!?]+$/, '').trim();
+  if (s && !leadsSentence && !/^I\b/.test(s)) {
+    s = s.charAt(0).toLowerCase() + s.slice(1);
+  }
+  return s;
+}
+
 // --- pure composition -------------------------------------------------------
 
 // Compose one free-text block from the stored refined answers. Joins each

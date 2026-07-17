@@ -38,15 +38,18 @@
         <button type="button" class="home__start" id="home-start">Start — about 12 minutes</button>
         <p class="home__reassure">Nothing is sent anywhere — everything stays in this browser.</p>
 
-        <nav class="home__menu-wrap" aria-label="Jump to a section">
-          <ul class="home__menu">
-            <li><button type="button" class="home__menu-item" data-target="readiness" aria-describedby="home-menu-hint">Readiness check</button></li>
-            <li><button type="button" class="home__menu-item" data-target="part1" aria-describedby="home-menu-hint">Part 1: What happened</button></li>
-            <li><button type="button" class="home__menu-item" data-target="part2" aria-describedby="home-menu-hint">Part 2: How you know</button></li>
-            <li><button type="button" class="home__menu-item" data-target="transfer" aria-describedby="home-menu-hint">Review &amp; copy</button></li>
-          </ul>
-          <p class="home__menu-hint" id="home-menu-hint" hidden>Finish the readiness check to unlock the drafting steps.</p>
-        </nav>
+        <details class="home__menu-disclosure">
+          <summary class="home__menu-summary">Jump to a section — start with the readiness check</summary>
+          <nav class="home__menu-wrap" aria-label="Jump to a section">
+            <ul class="home__menu">
+              <li><button type="button" class="home__menu-item" data-target="readiness" aria-describedby="home-menu-hint">Readiness check</button></li>
+              <li><button type="button" class="home__menu-item" data-target="part1" aria-describedby="home-menu-hint">Part 1: What happened</button></li>
+              <li><button type="button" class="home__menu-item" data-target="part2" aria-describedby="home-menu-hint">Part 2: How you know</button></li>
+              <li><button type="button" class="home__menu-item" data-target="transfer" aria-describedby="home-menu-hint">Review &amp; copy</button></li>
+            </ul>
+            <p class="home__menu-hint" id="home-menu-hint" hidden>Finish the readiness check to unlock the drafting steps.</p>
+          </nav>
+        </details>
 
         <div id="save-control" class="save-control-wrap"></div>
 
@@ -75,11 +78,7 @@
     <section class="screen" id="screen-part1" hidden>
       <h2 id="part1-heading" tabindex="-1">Part 1: What happened</h2>
       <p class="part__timebox" id="part1-timebox"></p>
-      <p class="screen__lead">
-        Here we help you draft the form's field:
-        <strong>&ldquo;Provide as much detail as possible about the tax evasion or tax fraud.&rdquo;</strong>
-        You choose; the app writes the words.
-      </p>
+      <p class="screen__lead">You choose; the app writes the words.</p>
       <div id="builder-ft1" class="builder"></div>
     </section>
 
@@ -87,10 +86,7 @@
     <section class="screen" id="screen-part2" hidden>
       <h2 id="part2-heading" tabindex="-1">Part 2: How you became aware</h2>
       <p class="part__timebox" id="part2-timebox"></p>
-      <p class="screen__lead">
-        Here we help you draft the form's field:
-        <strong>&ldquo;Explain how and when you became aware of the tax evasion or tax fraud.&rdquo;</strong>
-      </p>
+      <p class="screen__lead">You choose; the app writes the words.</p>
       <div id="builder-ft2" class="builder"></div>
     </section>
 
@@ -109,7 +105,7 @@
   <!-- ================================================ Persistent controls -->
   <nav id="screen-controls" aria-label="Screen navigation">
     <button type="button" class="screen-controls__back" id="ctl-back">&larr; Back</button>
-    <button type="button" class="screen-controls__menu" id="ctl-menu">Menu</button>
+    <button type="button" class="screen-controls__menu" id="ctl-menu">Home</button>
     <button type="button" class="screen-controls__next" id="ctl-next">Next &rarr;</button>
   </nav>
 
