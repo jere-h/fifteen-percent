@@ -1,20 +1,17 @@
 // safety.js — Renders the persistent Safety panel.
 //
-// Honest device-trail caveats + the "Save my progress on this device" toggle
-// (default ON — autosave, wired to store) which the user can switch off to
-// run in-memory-only + a one-tap "Clear my data" button. Caveat copy is
-// present and legible regardless of theme; nothing here is hidden at rest.
+// Honest device-trail caveats + a plain-language DISCLAIMER that progress is
+// saved on this device only (never a toggle — on-device saving is the whole
+// point of the tool, so there is nothing to switch off) + a one-tap "Clear my
+// data" button. Caveat copy is present and legible regardless of theme;
+// nothing here is hidden at rest.
 //
 // Contract:
 //   export function renderSafety(rootEl, onClear) -> void
 // Imports store.js only. app.js wires onClear to store.clear() +
 // renderAll(createEmptyDraft()).
 
-import {
-  isPersistenceEnabled,
-  setPersistenceEnabled,
-  storageAvailable,
-} from './store.js';
+import { storageAvailable } from './store.js';
 
 // Honest, plain-language device-trail caveats. Local-only is not anonymous:
 // clearing this page does NOT erase these separate trails.
@@ -32,21 +29,6 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
-}
-
-// Keep every persistence toggle on the page (the surfaced control near the flow
-// and the one inside the Safety panel) reflecting the single stored flag. One
-// source of truth, no second storage key.
-let syncBound = false;
-function bindPersistenceSync() {
-  if (syncBound) return;
-  syncBound = true;
-  document.addEventListener('persistence:changed', () => {
-    const on = isPersistenceEnabled();
-    document.querySelectorAll('.js-persistence-toggle').forEach((box) => {
-      if (box.checked !== on) box.checked = on;
-    });
-  });
 }
 
 /**
@@ -78,34 +60,24 @@ export function renderSafety(rootEl, onClear) {
   }
   panel.appendChild(caveats);
 
-  // --- Persistence toggle (default on — autosave) -------------------------
-  const toggle = el('label', 'safety__toggle');
-
-  bindPersistenceSync();
-
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.className = 'safety__toggle-input js-persistence-toggle';
+  // --- On-device saving disclaimer (not a toggle) -------------------------
+  // Saving on this device is the whole point of the tool, so there is nothing
+  // to switch off. This is a reassurance, not a choice.
   const canStore = storageAvailable();
-  checkbox.checked = canStore && isPersistenceEnabled();
-  if (!canStore) checkbox.disabled = true;
-
-  const toggleText = el('span', 'safety__toggle-label');
-  toggleText.appendChild(el('span', 'safety__toggle-title', 'Save my progress on this device'));
-  const helpText = canStore
-    ? 'On by default, so you can leave and come back. Your answers are stored only in this browser — anyone using this device could then find them. Turn off to keep this session in memory only, and use "Clear my data" any time to wipe what is already saved.'
-    : 'Storage is unavailable in this browser (private mode or full). Your work stays in memory only and will not survive a reload.';
-  toggleText.appendChild(el('span', 'safety__toggle-help', helpText));
-
-  toggle.appendChild(checkbox);
-  toggle.appendChild(toggleText);
-
-  checkbox.addEventListener('change', () => {
-    setPersistenceEnabled(checkbox.checked);
-    document.dispatchEvent(new CustomEvent('persistence:changed'));
-  });
-
-  panel.appendChild(toggle);
+  const disclosure = el('div', 'safety__disclaimer');
+  disclosure.appendChild(
+    el('span', 'safety__disclaimer-title', 'Saved on this device only')
+  );
+  disclosure.appendChild(
+    el(
+      'span',
+      'safety__disclaimer-help',
+      canStore
+        ? 'Your answers are kept in this browser so you can close the tab and come back — they are never sent to any server. Anyone using this device could open them, so use "Clear my data" below when you are done.'
+        : 'Storage is unavailable in this browser (private mode or full), so your work stays in memory only and will not survive a reload. Nothing is ever sent anywhere.'
+    )
+  );
+  panel.appendChild(disclosure);
 
   // --- One-tap Clear my data ---------------------------------------------
   const clearWrap = el('div', 'safety__clear-wrap');
@@ -130,52 +102,38 @@ export function renderSafety(rootEl, onClear) {
 }
 
 /**
- * Render a compact, always-visible "save on this device only" control near the
- * flow (TRD-20) — the product's answer to IRAS's unsaveable 15-minute session.
- * Strictly gated on the same store.js flag as the Safety panel toggle; no
- * second storage key; nothing is transmitted.
+ * Render the compact, always-visible on-device saving DISCLAIMER near the flow
+ * — the product's answer to IRAS's unsaveable 15-minute session. It is a
+ * reassurance, never a toggle: saving on the device is the whole point, so
+ * there is nothing to switch off. Nothing is ever transmitted.
  * @param {HTMLElement} rootEl
  */
 export function renderSaveControl(rootEl) {
   if (!rootEl) return;
-  bindPersistenceSync();
   rootEl.textContent = '';
 
   const canStore = storageAvailable();
 
-  const toggle = el('label', 'save-control');
+  const note = el('p', 'save-disclaimer');
 
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.className = 'save-control__input js-persistence-toggle';
-  checkbox.checked = canStore && isPersistenceEnabled();
-  if (!canStore) checkbox.disabled = true;
+  const icon = el('span', 'save-disclaimer__icon', '🔒');
+  icon.setAttribute('aria-hidden', 'true');
+  note.appendChild(icon);
 
-  const text = el('span', 'save-control__text');
+  const text = el('span', 'save-disclaimer__text');
   text.appendChild(
-    el(
-      'span',
-      'save-control__title',
-      'Save my progress on this device only — nothing is sent'
-    )
+    el('span', 'save-disclaimer__title', 'Saved on this device only — never sent anywhere.')
   );
   text.appendChild(
     el(
       'span',
-      'save-control__help',
+      'save-disclaimer__help',
       canStore
-        ? 'So you can close this and come back to where you left off. Stored only in this browser; anyone using this device could find it. Turn off any time to keep this session in memory only.'
-        : 'Storage is unavailable in this browser (private mode or full), so your work stays in memory only and will not survive a reload.'
+        ? 'Close the tab and pick up where you left off. Your answers stay in this browser; nothing reaches any server.'
+        : 'This browser is in private mode or full, so your work stays in memory only and will not survive a reload. Nothing reaches any server either way.'
     )
   );
+  note.appendChild(text);
 
-  toggle.appendChild(checkbox);
-  toggle.appendChild(text);
-
-  checkbox.addEventListener('change', () => {
-    setPersistenceEnabled(checkbox.checked);
-    document.dispatchEvent(new CustomEvent('persistence:changed'));
-  });
-
-  rootEl.appendChild(toggle);
+  rootEl.appendChild(note);
 }

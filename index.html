@@ -15,44 +15,53 @@
 
       <header class="banner">
         <p class="banner__mark">Independent tool — not affiliated with IRAS. Nothing you type is sent anywhere.</p>
-        <p class="banner__verified">Figures verified 16 Jul 2026.</p>
       </header>
 
-      <header class="hero">
-        <h1 class="hero__headline">
-          You could be paid
-          <span class="hero__figure" id="hero-figure">up to ~S$100,000</span>
-          for reporting tax evasion to IRAS — a reward of
-          <span class="hero__rate">15%</span>
-          of the tax they recover.
-        </h1>
+      <header class="hero hero--home">
+        <p class="hero__eyebrow">Report tax evasion to IRAS — privately</p>
+        <h1 class="hero__headline" id="home-heading" tabindex="-1">Fifteen&nbsp;Percent</h1>
         <p class="hero__subhead">
-          Tap, don&rsquo;t type — this private tool drafts the two hardest parts for you.
+          IRAS can reward informants a discretionary <span class="hero__rate">15%</span> of the tax it recovers — up to&nbsp;~S$100,000. This tool taps out the two hardest parts of the report for you, on this device alone.
         </p>
       </header>
 
-      <section id="reckoner" class="reckoner" aria-label="Estimate your possible reward"></section>
+      <section class="phases" aria-labelledby="phases-title">
+        <h2 class="phases__title" id="phases-title">Four short phases</h2>
+        <ol class="phases__list">
+          <li class="phase-card">
+            <span class="phase-card__num" aria-hidden="true">1</span>
+            <span class="phase-card__body">
+              <span class="phase-card__name">Readiness check</span>
+              <span class="phase-card__desc">A one-minute check that you have what the form needs.</span>
+            </span>
+          </li>
+          <li class="phase-card">
+            <span class="phase-card__num" aria-hidden="true">2</span>
+            <span class="phase-card__body">
+              <span class="phase-card__name">Part 1 — What happened</span>
+              <span class="phase-card__desc">Tap through choices; the app writes the wording.</span>
+            </span>
+          </li>
+          <li class="phase-card">
+            <span class="phase-card__num" aria-hidden="true">3</span>
+            <span class="phase-card__body">
+              <span class="phase-card__name">Part 2 — How you know</span>
+              <span class="phase-card__desc">The same, for how and when you became aware.</span>
+            </span>
+          </li>
+          <li class="phase-card">
+            <span class="phase-card__num" aria-hidden="true">4</span>
+            <span class="phase-card__body">
+              <span class="phase-card__name">Review &amp; copy</span>
+              <span class="phase-card__desc">Copy your two blocks straight into the IRAS form.</span>
+            </span>
+          </li>
+        </ol>
+      </section>
 
       <div class="home__action">
-        <h2 class="home__heading" id="home-heading" tabindex="-1">Ready when you are</h2>
-        <button type="button" class="home__start" id="home-start">Start — about 12 minutes</button>
-        <p class="home__reassure">Nothing is sent anywhere — everything stays in this browser.</p>
-
-        <details class="home__menu-disclosure">
-          <summary class="home__menu-summary">Jump to a section — start with the readiness check</summary>
-          <nav class="home__menu-wrap" aria-label="Jump to a section">
-            <ul class="home__menu">
-              <li><button type="button" class="home__menu-item" data-target="readiness" aria-describedby="home-menu-hint">Readiness check</button></li>
-              <li><button type="button" class="home__menu-item" data-target="part1" aria-describedby="home-menu-hint">Part 1: What happened</button></li>
-              <li><button type="button" class="home__menu-item" data-target="part2" aria-describedby="home-menu-hint">Part 2: How you know</button></li>
-              <li><button type="button" class="home__menu-item" data-target="transfer" aria-describedby="home-menu-hint">Review &amp; copy</button></li>
-            </ul>
-            <p class="home__menu-hint" id="home-menu-hint" hidden>Finish the readiness check to unlock the drafting steps.</p>
-          </nav>
-        </details>
-
+        <button type="button" class="home__start" id="home-start">Start — about 10 minutes</button>
         <div id="save-control" class="save-control-wrap"></div>
-
         <p class="home__links">
           <button type="button" class="home__privacy-link" id="home-privacy">Privacy &amp; your data</button>
         </p>
@@ -113,23 +122,6 @@
   <div id="safety-host" hidden>
     <section id="safety" class="section" aria-label="Safety and privacy"></section>
   </div>
-
-  <!-- Intro dialog content, cloned into the modal by router.js -->
-  <template id="intro-modal-template">
-    <div class="modal__content intro">
-      <h2 class="modal__title" id="intro-modal-title" tabindex="-1">Here&rsquo;s how this works</h2>
-      <ul class="intro__list">
-        <li>The IRAS form already collects the simple choices itself. This tool drafts the two hard parts for you: <em>what happened</em>, and <em>how you became aware</em>.</li>
-        <li>You tap to choose; the app writes the words. Almost no typing.</li>
-        <li>Everything stays on this device. Nothing is ever sent anywhere.</li>
-        <li>About 12 minutes in all. You can leave and come back to where you left off.</li>
-      </ul>
-      <div class="modal__actions">
-        <button type="button" class="modal__btn modal__btn--primary" data-action="start-readiness">Start the readiness check</button>
-        <button type="button" class="modal__btn modal__btn--secondary" data-action="dismiss">Not now</button>
-      </div>
-    </div>
-  </template>
 
   <div id="sr-live" class="sr-only" aria-live="polite" role="status"></div>
 

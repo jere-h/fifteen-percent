@@ -244,31 +244,6 @@ export const money = {
 };
 
 // ---------------------------------------------------------------------------
-// rewardBands — tap-only bands for the reckoner (TRD-4). No free text.
-// ---------------------------------------------------------------------------
-// Each band maps to the top of its range; reward = min(ceiling, top × rate).
-// `more` resolves to the capped ceiling; `unsure` (and no selection) keeps the
-// generic hero figure.
-export const rewardBands = [
-  { id: "lt10k", label: "under S$10k", top: 10000 },
-  { id: "10-50k", label: "S$10k–50k", top: 50000 },
-  { id: "50-200k", label: "S$50k–200k", top: 200000 },
-  { id: "more", label: "more", top: null },
-  { id: "unsure", label: "not sure", top: null },
-];
-
-// Derive the honest reward estimate for a band id. Returns a whole-dollar
-// number, or null for "not sure" / an unknown id (which keeps the generic
-// ceiling in the hero). Never trusted from storage — recomputed on demand.
-export function estimateForBand(id) {
-  if (!id || id === "unsure") return null;
-  const band = rewardBands.find((b) => b.id === id);
-  if (!band) return null;
-  const top = band.top == null ? money.ceiling / money.rate : band.top;
-  return Math.min(money.ceiling, Math.round(top * money.rate));
-}
-
-// ---------------------------------------------------------------------------
 // freeTextBuilders — tap-first prompt trees for the two hard free-text fields
 // ---------------------------------------------------------------------------
 // This is the heart of the reframed product (TRD-3): the IRAS form already

@@ -968,61 +968,146 @@ p {
 }
 
 /* ------------------------------------------------------------- Home screen */
-/* Compact hub: independence strip, condensed money hero, reckoner, then the
-   action block (Start + phase menu + save control + privacy). The hook,
-   reckoner and Start sit above the fold at 390x844; the menu/save/privacy may
-   fall below on the shortest phones. */
+/* Sleek title screen: independence strip, a calm title hero, a four-phase
+   overview (a single row on desktop, a scrolling stack on mobile) and one
+   Start button. No money reckoner, no jump menu — just what to expect. */
 #screen-home {
-  gap: var(--space-2);
+  gap: var(--space-4);
+  padding-block: var(--space-3) var(--space-2);
 }
 
-#screen-home .hero {
-  gap: var(--space-1);
+.hero--home {
+  gap: var(--space-3);
+  text-align: center;
+  align-items: center;
 }
 
-/* Home trims the shared hero so the money hook, reckoner and Start clear the
-   390x844 fold (TRD-1.3). The figure stays the dominant element; the headline
-   and subhead are tightened, never below the 18px body floor. */
+.hero__eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-size: .85rem;
+  color: var(--color-link);
+}
+
 #screen-home .hero__headline {
-  font-size: 1.2rem;
-  line-height: 1.3;
-}
-
-#screen-home .hero__figure {
-  font-size: clamp(2rem, 8vw, 2.6rem);
+  font-size: clamp(2.4rem, 9vw, 3.6rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
 }
 
 #screen-home .hero__subhead {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+  max-width: 52ch;
+  margin-inline: auto;
+}
+
+.hero--home .hero__rate {
+  color: var(--color-link);
+}
+
+/* --------------------------------------------------- Phases overview (home) */
+.phases {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.phases__title {
+  margin: 0;
+  text-align: center;
   font-size: 1rem;
-  line-height: 1.45;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.phases__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  counter-reset: phase;
+}
+
+.phase-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.phase-card__num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.phase-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.phase-card__name {
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: var(--color-fg);
+}
+
+.phase-card__desc {
+  font-size: .95rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+/* Lay all four phases out in a row on wider viewports. */
+@media (min-width: 720px) {
+  .phases__list {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+  }
+
+  .phase-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
 }
 
 .home__action {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.home__heading {
-  margin: 0;
-  font-size: 1.15rem;
-}
-
-.home__reassure {
-  margin: 0;
-  font-size: 1rem;
-  color: var(--color-muted);
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .home__start {
-  min-height: 44px;
-  padding: var(--space-3) var(--space-5);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-7);
   border: none;
   border-radius: var(--radius-pill);
   background: var(--color-accent-strong);
   color: var(--color-on-accent);
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   cursor: pointer;
   transition: filter .2s var(--ease-soft), transform .12s var(--ease-soft);
 }
@@ -1034,44 +1119,6 @@ p {
 
 .home__start:active {
   transform: translateY(1px);
-}
-
-.home__menu-wrap {
-  margin: 0;
-}
-
-.home__menu {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.home__menu-item {
-  width: 100%;
-  min-height: 44px;
-  text-align: left;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: border-color .2s var(--ease-soft), background .2s var(--ease-soft);
-}
-
-.home__menu-item:hover,
-.home__menu-item:focus-visible {
-  border-color: var(--color-accent);
-}
-
-.home__menu-item:disabled {
-  opacity: .5;
-  cursor: not-allowed;
 }
 
 .home__links {
@@ -1088,6 +1135,67 @@ p {
   font-size: 1rem;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* ---------------------------------- On-device saving disclaimer (issue 2) */
+/* A reassurance, never a toggle. Surfaced near the flow and (fuller) inside
+   the Safety panel. */
+.save-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 46ch;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.save-disclaimer__icon {
+  flex: none;
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.save-disclaimer__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.save-disclaimer__title {
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.save-disclaimer__help {
+  font-size: .95rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.safety__disclaimer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.safety__disclaimer-title {
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.safety__disclaimer-help {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--color-muted);
 }
 
 /* -------------------------------------- Free-text builders (TRD-3.2) */

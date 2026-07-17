@@ -1,9 +1,9 @@
 // store.js — single-key localStorage persistence for the report draft.
 //
-// Persistence is ON by default (autosave every step, matching the brief) with
-// a "Save my progress on this device" toggle the user can switch OFF to run
-// in-memory-only. Turning it off wipes anything already saved so the choice
-// actually clears the trail rather than leaving stale data behind.
+// On-device saving is ALWAYS on (autosave every step) — it is the whole point
+// of the tool, so there is no opt-out. There is no second storage key and no
+// toggle: saving on this device is presented to the reader as a disclaimer
+// (see js/safety.js), never a choice.
 //
 // The module degrades to in-memory-only WITHOUT throwing when localStorage is
 // unavailable or full (private-browsing mode, quota exceeded, disabled storage).
@@ -11,14 +11,6 @@
 // tell the reader that resume will not work.
 
 import { DRAFT_KEY, SCHEMA_VERSION, createEmptyDraft } from './state.js';
-
-// Second storage key: the '1' | '0' flag for the persistence toggle.
-const PERSISTENCE_KEY = 'fifteenpct.persistenceEnabled';
-
-// In-memory mirror of the persistence flag. Used as the source of truth when
-// localStorage cannot be read or written (so the toggle still works this
-// session, it just cannot survive a reload).
-let inMemoryPersistence = true;
 
 // Cached probe result. Recomputed on first use and after any failure.
 let storageOk = null;
@@ -48,47 +40,9 @@ export function storageAvailable() {
   return storageOk;
 }
 
-// Public: turn persistence on or off. Persists the flag itself when
-// storage allows; always mirrors it in memory so the current session honors it
-// even if storage is blocked.
-export function setPersistenceEnabled(on) {
-  const enabled = !!on;
-  inMemoryPersistence = enabled;
-  if (storageAvailable()) {
-    try {
-      window.localStorage.setItem(PERSISTENCE_KEY, enabled ? '1' : '0');
-    } catch (err) {
-      // Write failed after the probe passed (e.g. quota hit). Fall back to the
-      // in-memory flag and stop trusting storage.
-      storageOk = false;
-    }
-  }
-  // When persistence is switched OFF, remove any draft already on the device so
-  // the choice actually clears the trail rather than leaving stale data behind.
-  if (!enabled) {
-    removeDraft();
-  }
-}
-
-// Public: is persistence currently enabled? Reads the stored flag when it is
-// available, otherwise the in-memory mirror. Absent (never toggled) means ON
-// (the default); only an explicit '0' turns it off.
-export function isPersistenceEnabled() {
-  if (storageAvailable()) {
-    try {
-      const raw = window.localStorage.getItem(PERSISTENCE_KEY);
-      return raw === null ? true : raw === '1';
-    } catch (err) {
-      storageOk = false;
-    }
-  }
-  return inMemoryPersistence;
-}
-
-// Public: persist the draft. No-op when persistence is opted out or when
-// storage is unavailable / write-blocked. Never throws.
+// Public: persist the draft. No-op only when storage is unavailable /
+// write-blocked (private mode, quota). Never throws.
 export function save(draft) {
-  if (!isPersistenceEnabled()) return;
   if (!storageAvailable()) return;
   try {
     const payload = JSON.stringify(draft);
@@ -102,13 +56,11 @@ export function save(draft) {
 }
 
 // Public: read the draft back. Returns a fresh createEmptyDraft() on:
-//   - persistence opted out (in-memory-only session),
 //   - storage unavailable,
 //   - the key missing,
 //   - corrupt / unparseable JSON,
 //   - any schemaVersion we do not recognize (no migration, no stale-shape load).
 export function load() {
-  if (!isPersistenceEnabled()) return createEmptyDraft();
   if (!storageAvailable()) return createEmptyDraft();
 
   let raw;
@@ -143,8 +95,7 @@ export function clear() {
   removeDraft();
 }
 
-// Remove the stored draft only. Leaves the persistence-flag choice intact
-// unless the caller (setPersistenceEnabled(false)) means to clear it too.
+// Remove the stored draft. Used by the Safety panel's "Clear my data".
 function removeDraft() {
   if (!storageAvailable()) return;
   try {

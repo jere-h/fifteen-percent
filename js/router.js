@@ -20,8 +20,6 @@
 //                                    FLOW-derived Back/Menu/Next; distinct from
 //                                    the no-op setControls(null))
 
-import { openModal, closeModal } from './modal.js';
-
 // Canonical order. 'redirect' is a member but sits OFF the linear path — the
 // readiness gate routes to it explicitly; Next/Back on the neighbours skip it.
 const SCREENS = ['home', 'readiness', 'redirect', 'part1', 'part2', 'assembly', 'transfer'];
@@ -175,7 +173,9 @@ export function showScreen(name, opts) {
   if (focus) {
     announce(name);
     const screen = el('screen-' + name);
-    const heading = screen && screen.querySelector('h2[tabindex="-1"]');
+    // Each screen's focus target is its labelling heading with tabindex="-1".
+    // Home leads with an <h1>; every other screen an <h2>.
+    const heading = screen && screen.querySelector('h1[tabindex="-1"], h2[tabindex="-1"]');
     if (heading && typeof heading.focus === 'function') heading.focus();
   }
 
@@ -210,42 +210,13 @@ export function clearControls() {
   applyControls();
 }
 
-// Build + wire the intro dialog from its <template>, then open it.
-function openIntroModal() {
-  const tpl = el('intro-modal-template');
-  if (!tpl || !tpl.content) return;
-  const first = tpl.content.firstElementChild;
-  if (!first) return;
-  const node = first.cloneNode(true);
-
-  const primary = node.querySelector('[data-action="start-readiness"]');
-  const secondary = node.querySelector('[data-action="dismiss"]');
-  if (primary) {
-    primary.addEventListener('click', function () {
-      closeModal();
-      showScreen('readiness');
-    });
-  }
-  if (secondary) {
-    secondary.addEventListener('click', function () {
-      closeModal();
-    });
-  }
-
-  openModal({ titleId: 'intro-modal-title', contentNode: node, invoker: el('home-start') });
-}
-
 function boot() {
-  // Home menu -> jump straight to a phase.
-  document.querySelectorAll('.home__menu-item').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      showScreen(btn.dataset.target);
-    });
-  });
-
-  // Start -> intro dialog.
+  // Start -> straight into the readiness check. The Home screen's phases
+  // overview already sets expectations, so no interstitial dialog is needed.
   const start = el('home-start');
-  if (start) start.addEventListener('click', openIntroModal);
+  if (start) start.addEventListener('click', function () {
+    showScreen('readiness');
+  });
 
   // Initial paint: Home, without stealing focus on load.
   showScreen('home', { focus: false });
