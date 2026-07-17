@@ -13,29 +13,6 @@
 // public IRAS record; update them when you re-check.
 
 // ---------------------------------------------------------------------------
-// evidenceAttachments — evidence answer -> concrete "bring this file" wording
-// ---------------------------------------------------------------------------
-// Its keys are the canonical evidence option strings, reused verbatim by the
-// readiness `evidence` item below, so the two never drift. Items with
-// attach:false are things a user cannot attach as a file (an in-person account)
-// and render as a gentle note instead.
-export const evidenceAttachments = {
-  "Invoices or receipts": { attach: true, text: "invoices or receipts" },
-  "Bank or payment records": { attach: true, text: "bank or payment records" },
-  "Messages or emails": { attach: true, text: "message or email exports" },
-  "Photos or screenshots": { attach: true, text: "photos or screenshots" },
-  "Contracts or agreements": { attach: true, text: "contracts or agreements" },
-  "What I saw or overheard in person": {
-    attach: false,
-    text: "what you saw or overheard in person (nothing to attach — describe it in the summary)",
-  },
-  "Nothing kept yet, only my account": {
-    attach: false,
-    text: "nothing kept yet (there is no file to attach — your account is the record)",
-  },
-};
-
-// ---------------------------------------------------------------------------
 // readiness — the tap-first readiness check (Part 0)
 // ---------------------------------------------------------------------------
 // This does NOT re-collect the IRAS form's simple structured fields as prose —
@@ -109,8 +86,11 @@ export const parts = {
 // submits or uploads anything. `lastVerified` replaces the old, deleted
 // transferMap.lastVerified marker.
 export const iras = {
-  reportUrl: "https://www.iras.gov.sg/contact-us/report-tax-evasion",
-  lastVerified: "2026-07-16",
+  // The live FormSG form itself (reached from IRAS's "report tax evasion"
+  // page). Opening it is plain user navigation in a new tab — no user data is
+  // ever placed in the URL, and the app never submits or uploads anything.
+  reportUrl: "https://form.gov.sg/682fea70b14df1e60402f3a4",
+  lastVerified: "2026-07-17",
 };
 
 // ---------------------------------------------------------------------------

@@ -19,7 +19,7 @@
 // Contract (UNCHANGED signature): export function renderTransfer(rootEl, draft).
 
 import { buildNarrative, renderCheatSheet } from './draft.js';
-import { evidenceAttachments, money, iras } from './data.js';
+import { money, iras } from './data.js';
 import { downloadDocument } from './save-doc.js';
 import { writeText } from './clipboard.js';
 import { showScreen } from './router.js';
@@ -148,21 +148,10 @@ function rewardPhrase(draft) {
   return money.ceilingPhrase + ", at IRAS's discretion, never a promise";
 }
 
-// The attachments reminder, derived from the readiness evidence multi-select.
-function attachmentSummary(draft) {
-  const ev =
-    (draft && draft.readiness && draft.readiness.answers && draft.readiness.answers.evidence) ||
-    [];
-  const list = Array.isArray(ev) ? ev : [];
-  const attachables = [];
-  list.forEach((opt) => {
-    const meta = evidenceAttachments[opt];
-    if (meta && meta.attach) attachables.push(meta.text);
-  });
-  if (attachables.length) {
-    return 'Attach your ' + attachables.join(', ') + '.';
-  }
-  return 'You noted nothing to attach — your account in the summary is the record.';
+// A neutral attachments reminder. The form handles attachments itself, so this
+// simply prompts the reader to bring whatever they kept.
+function attachmentSummary() {
+  return 'Attach anything you kept — invoices, messages, records or screenshots. If you have nothing to attach, your written account is the record.';
 }
 
 // One Copy block for a free-text field: exact form-field heading, the composed
@@ -229,49 +218,48 @@ export function renderTransfer(rootEl, draft) {
 
   // --- Header -------------------------------------------------------------
   const header = el('header', 'transfer__header');
-  header.appendChild(el('p', 'eyebrow', 'Copy into the form'));
-  const heading = el('h2', null, 'Your two blocks, ready to paste');
+  header.appendChild(el('p', 'eyebrow', "You're ready"));
+  const heading = el('h2', null, 'Your report is ready to file');
   heading.id = 'transfer-heading';
   heading.tabIndex = -1; // focus target on view switch (router)
   header.appendChild(heading);
-  header.appendChild(
-    el(
-      'p',
-      'transfer__intro',
-      'Copy each block into its matching field on the IRAS form. This tool never sends anything to IRAS and never submits on your behalf.'
-    )
-  );
   rootEl.appendChild(header);
 
-  // --- The two Copy blocks ------------------------------------------------
-  const fields = el('div', 'transfer__blocks');
-  KEYS.forEach((key) => {
-    fields.appendChild(buildCopyBlock(key, model[key]));
-  });
-  rootEl.appendChild(fields);
-
-  // --- Read-only cheat-sheet (no Copy buttons) ----------------------------
-  rootEl.appendChild(renderCheatSheet(safe, 'transfer-cheatsheet'));
-
-  // --- You're ready + next steps + Save / Open actions (TRD-4.5/4.6) ------
+  // --- You're ready + the three next steps + Save / Open actions ----------
+  // Shown FIRST (issue 10): the streamlined path is "here's what to do next",
+  // then the blocks to copy are right below.
   const ready = el('section', 'transfer__ready');
 
   const cue = el('p', 'transfer__ready-cue');
   cue.setAttribute('role', 'status');
   if (bothReady) {
-    cue.textContent = "You’re ready — both blocks are drafted.";
+    cue.textContent = 'Both blocks are drafted. Open the IRAS form and follow these three steps:';
   } else {
     cue.textContent =
-      filled.length + ' of ' + KEYS.length + ' blocks drafted. You can still save and open the form.';
+      filled.length + ' of ' + KEYS.length + ' blocks drafted so far. You can still open the form now. ';
     const link = el('button', 'transfer__recognition-link', 'Finish the other part');
     link.type = 'button';
     link.addEventListener('click', function () {
       showScreen(model.ft1.text.trim() !== '' ? 'part2' : 'part1');
     });
-    cue.appendChild(document.createTextNode(' '));
     cue.appendChild(link);
   }
   ready.appendChild(cue);
+
+  ready.appendChild(el('p', 'transfer__ready-title', 'Three steps on the form:'));
+  const steps = el('ol', 'transfer__ready-steps');
+  const step1 = el('li');
+  step1.appendChild(document.createTextNode('Paste block 1 into '));
+  step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft1.label + '”'));
+  step1.appendChild(document.createTextNode(', and block 2 into '));
+  step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft2.label + '”'));
+  step1.appendChild(document.createTextNode(' — both are just below.'));
+  steps.appendChild(step1);
+  steps.appendChild(el('li', null, 'Fill the simple choices yourself — the recap at the foot of this page reminds you what to have ready.'));
+  const step3 = el('li');
+  step3.appendChild(document.createTextNode('Attach your supporting files. ' + attachmentSummary()));
+  steps.appendChild(step3);
+  ready.appendChild(steps);
 
   ready.appendChild(
     el(
@@ -281,23 +269,14 @@ export function renderTransfer(rootEl, draft) {
     )
   );
 
-  ready.appendChild(el('p', 'transfer__ready-title', 'Three steps on the form:'));
-  const steps = el('ol', 'transfer__ready-steps');
-  const step1 = el('li');
-  step1.appendChild(document.createTextNode('Paste block 1 into '));
-  step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft1.label + '”'));
-  step1.appendChild(document.createTextNode(', and block 2 into '));
-  step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft2.label + '”'));
-  step1.appendChild(document.createTextNode('.'));
-  steps.appendChild(step1);
-  steps.appendChild(el('li', null, 'Select the simple fields shown in your cheat-sheet above.'));
-  const step3 = el('li');
-  step3.appendChild(document.createTextNode('Attach your supporting files. ' + attachmentSummary(safe)));
-  steps.appendChild(step3);
-  ready.appendChild(steps);
-
-  // Actions: Save (local download) + Open IRAS (new tab). Neither transmits.
+  // Actions: Open IRAS (new tab, primary) + Save (local download). Neither transmits.
   const actions = el('div', 'transfer__actions');
+
+  const openLink = el('a', 'btn btn--primary transfer__open', 'Open the IRAS form');
+  openLink.href = iras.reportUrl;
+  openLink.target = '_blank';
+  openLink.rel = 'noopener noreferrer';
+  actions.appendChild(openLink);
 
   const saveBtn = el('button', 'btn btn--secondary transfer__save', 'Save my report as a document');
   saveBtn.type = 'button';
@@ -311,16 +290,10 @@ export function renderTransfer(rootEl, draft) {
         'Saved to your device as fifteen-percent-report.txt — nothing was sent anywhere.';
     } else {
       saveStatus.textContent =
-        'Could not start the download in this browser. Copy each block above instead.';
+        'Could not start the download in this browser. Copy each block below instead.';
     }
   });
   actions.appendChild(saveBtn);
-
-  const openLink = el('a', 'btn btn--primary transfer__open', 'Open the IRAS form');
-  openLink.href = iras.reportUrl;
-  openLink.target = '_blank';
-  openLink.rel = 'noopener noreferrer';
-  actions.appendChild(openLink);
 
   ready.appendChild(actions);
   ready.appendChild(saveStatus);
@@ -334,4 +307,14 @@ export function renderTransfer(rootEl, draft) {
   );
 
   rootEl.appendChild(ready);
+
+  // --- The two Copy blocks (right below the steps) ------------------------
+  const fields = el('div', 'transfer__blocks');
+  KEYS.forEach((key) => {
+    fields.appendChild(buildCopyBlock(key, model[key]));
+  });
+  rootEl.appendChild(fields);
+
+  // --- Read-only readiness recap (no Copy buttons) ------------------------
+  rootEl.appendChild(renderCheatSheet(safe, 'transfer-cheatsheet'));
 }

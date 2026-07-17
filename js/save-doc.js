@@ -13,39 +13,18 @@
 
 import { buildNarrative } from './draft.js';
 import { buildCheatSheet } from './cheatsheet.js';
-import { evidenceAttachments, money, iras } from './data.js';
+import { money, iras } from './data.js';
 
 const FILENAME = 'fifteen-percent-report.txt';
 
-// The attachments reminder, derived from the readiness `evidence` multi-select
-// and the canonical evidenceAttachments map. Attachable kinds become "attach
-// this file" lines; non-attachable kinds (an in-person account, nothing kept)
-// become gentle notes. Returns an array of strings.
-function attachmentLines(draft) {
-  const ev =
-    (draft && draft.readiness && draft.readiness.answers && draft.readiness.answers.evidence) ||
-    [];
-  const list = Array.isArray(ev) ? ev : [];
-  const attachables = [];
-  const notes = [];
-  list.forEach((opt) => {
-    const meta = evidenceAttachments[opt];
-    if (!meta) return;
-    if (meta.attach) attachables.push(meta.text);
-    else notes.push(meta.text);
-  });
-
-  const lines = [];
-  if (attachables.length) {
-    lines.push('Attach on the form: ' + attachables.join('; ') + '.');
-  }
-  notes.forEach((n) => lines.push('Note: ' + n + '.'));
-  if (!lines.length) {
-    lines.push(
-      'You have not noted any supporting files. Your own account in the summary is the record.'
-    );
-  }
-  return lines;
+// A neutral attachments reminder. The form handles attachments itself, so this
+// simply prompts the reader to bring whatever they kept. Returns an array of
+// strings.
+function attachmentLines() {
+  return [
+    'Attach anything you kept — invoices, messages, records or screenshots.',
+    'If you have nothing to attach, your written account above is the record.',
+  ];
 }
 
 // The honest reward phrase from the single money source: the personalised
@@ -116,7 +95,7 @@ export function buildDocument(draft) {
   out.push(thin);
   out.push('SUPPORTING FILES');
   out.push(thin);
-  attachmentLines(safe).forEach((l) => out.push('- ' + l));
+  attachmentLines().forEach((l) => out.push('- ' + l));
   out.push('');
 
   out.push(rule);

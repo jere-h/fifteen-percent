@@ -344,12 +344,17 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   progress.setAttribute('role', 'status');
   rootEl.appendChild(progress);
 
+  // On desktop the prompts (left) and the live "paste-ready text so far" (right)
+  // sit side by side (issue 5); on mobile they stack. The cols wrapper carries
+  // that responsive layout.
+  const cols = el('div', 'builder__cols');
+
   const wizard = el('div', 'checklist checklist--stepped builder__wizard');
   const summariesEl = el('div', 'checklist__summaries');
   const stepHost = el('div', 'checklist__stephost');
   wizard.appendChild(summariesEl);
   wizard.appendChild(stepHost);
-  rootEl.appendChild(wizard);
+  cols.appendChild(wizard);
 
   // Live preview of the growing block.
   const preview = el('div', 'builder__preview');
@@ -358,7 +363,9 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   previewText.setAttribute('role', 'status');
   previewText.setAttribute('aria-live', 'off');
   preview.appendChild(previewText);
-  rootEl.appendChild(preview);
+  cols.appendChild(preview);
+
+  rootEl.appendChild(cols);
 
   function promptAnswered(prompt) {
     const v = answers[prompt.id];
