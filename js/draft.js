@@ -20,6 +20,7 @@
 // renderDraft(rootEl, draft, onEdit).
 
 import { freeTextBuilders } from './data.js';
+import { buildCheatSheet, NOT_YET } from './cheatsheet.js';
 import { showScreen } from './router.js';
 
 // Final defensive backstop (TRD-3.4): even though an "unsure/not sure/rather not
@@ -149,10 +150,54 @@ function makeEditable(node, initial, commit) {
 }
 
 /**
+ * Shared, read-only cheat-sheet renderer (TRD-4.2 consumed by TRD-4.1/4.3).
+ * Turns the pure buildCheatSheet(draft) rows into a labelled description list of
+ * reminders — what the reader will SELECT in the form. It is explicitly NOT
+ * pasteable prose: no Copy buttons attach to it. `idPrefix` keeps the labelling
+ * id unique across the two screens that both mount a cheat-sheet.
+ * @param {object} draft
+ * @param {string} idPrefix
+ * @returns {HTMLElement}
+ */
+export function renderCheatSheet(draft, idPrefix) {
+  const prefix = idPrefix || 'cheatsheet';
+  const rows = buildCheatSheet(draft);
+
+  const section = el('section', 'cheatsheet');
+  section.setAttribute('aria-labelledby', prefix + '-title');
+
+  const title = el('h3', 'cheatsheet__title', 'In the form you will also select:');
+  title.id = prefix + '-title';
+  section.appendChild(title);
+
+  section.appendChild(
+    el(
+      'p',
+      'cheatsheet__note',
+      'These are reminders of what to pick in the form — not text to paste.'
+    )
+  );
+
+  const list = el('dl', 'cheatsheet__list');
+  rows.forEach((row) => {
+    const item = el('div', 'cheatsheet__row');
+    item.appendChild(el('dt', 'cheatsheet__label', row.label));
+    const dd = el('dd', 'cheatsheet__value', row.value);
+    if (row.value === NOT_YET) dd.classList.add('cheatsheet__value--pending');
+    item.appendChild(dd);
+    list.appendChild(item);
+  });
+  section.appendChild(list);
+
+  return section;
+}
+
+/**
  * Render the two-block Review into rootEl (#draft). Each block shows its exact
- * IRAS form field label and the app-written prose; editing a block calls
- * onEdit({ key, override }) with the hand-edited text (empty string clears the
- * override), then dispatches 'draft:changed'.
+ * IRAS form field label (an <h3>) and the app-written, inline-editable prose;
+ * editing a block calls onEdit({ freeText: { ft1: { override } } }) with the
+ * hand-edited text (empty string clears the override), then dispatches
+ * 'draft:changed'. Below the two blocks, the read-only readiness cheat-sheet.
  */
 export function renderDraft(rootEl, draft, onEdit) {
   if (!rootEl) return;
@@ -171,14 +216,12 @@ export function renderDraft(rootEl, draft, onEdit) {
   heading.tabIndex = -1; // focus target on screen switch (router)
   rootEl.appendChild(heading);
 
-  // Empty state — the single warm-gradient-orb hero moment. Actionable path
-  // forward rather than a dead end.
+  // Recognition of progress: how many of the two blocks are drafted, with a path
+  // back to finish the other. Shown above the blocks in every non-complete state.
   if (!filled.length) {
     const empty = el('div', 'draft__empty');
     empty.setAttribute('role', 'status');
-    empty.appendChild(
-      el('p', null, 'Draft the two parts to build your report')
-    );
+    empty.appendChild(el('p', null, 'Draft the two parts to build your report'));
     const cta = el('button', 'draft__empty-cta', 'Start Part 1');
     cta.type = 'button';
     cta.addEventListener('click', () => {
@@ -186,76 +229,75 @@ export function renderDraft(rootEl, draft, onEdit) {
     });
     empty.appendChild(cta);
     rootEl.appendChild(empty);
-    return;
-  }
-
-  // Recognition of progress: how many of the two blocks are drafted, with a path
-  // back to finish the other.
-  if (filled.length < KEYS.length) {
+  } else if (filled.length < KEYS.length) {
     const partial = el('p', 'draft__recognition');
     partial.setAttribute('role', 'status');
     partial.appendChild(
       document.createTextNode(filled.length + ' of ' + KEYS.length + ' blocks drafted so far. ')
     );
-    const missing = KEYS.indexOf('ft1') === -1 || model.ft1.text.trim() !== '' ? 'part2' : 'part1';
+    const missing = model.ft1.text.trim() !== '' ? 'part2' : 'part1';
     const back = el('button', 'draft__recognition-link', 'Finish the other part');
     back.type = 'button';
     back.addEventListener('click', () => {
       showScreen(missing);
     });
     partial.appendChild(back);
-    partial.appendChild(
-      document.createTextNode(' — your report grows as you go.')
-    );
+    partial.appendChild(document.createTextNode(' — your report grows as you go.'));
     rootEl.appendChild(partial);
   }
 
-  rootEl.appendChild(
-    el(
-      'p',
-      'draft__note',
-      'Tap a block to reword it. Your edits are kept and used when you copy into the form.'
-    )
-  );
+  // The two editable blocks (only when at least one has content — an all-empty
+  // draft shows just the CTA above plus the cheat-sheet below).
+  if (filled.length) {
+    rootEl.appendChild(
+      el(
+        'p',
+        'draft__note',
+        'Tap a block to reword it. Your edits are kept and used when you copy into the form.'
+      )
+    );
 
-  const container = el('div', 'draft');
+    const container = el('div', 'draft');
 
-  KEYS.forEach((key) => {
-    const block = model[key];
-    const cfg = freeTextBuilders[key];
-    const section = el('section', 'draft__block');
+    KEYS.forEach((key) => {
+      const block = model[key];
+      const section = el('section', 'draft__block');
 
-    // The EXACT IRAS form field label so the reader knows where each block goes.
-    const labelId = 'draft-block-label-' + key;
-    const labelEl = el('p', 'draft__block-label', 'Form field: “' + block.label + '”');
-    labelEl.id = labelId;
-    section.appendChild(labelEl);
+      // The EXACT IRAS form field label (an <h3>) so the reader knows where each
+      // block goes, and so the editable body can be labelled by it.
+      const labelId = 'draft-block-label-' + key;
+      const labelEl = el('h3', 'draft__block-label', 'Form field: “' + block.label + '”');
+      labelEl.id = labelId;
+      section.appendChild(labelEl);
 
-    const hasText = block.text && block.text.trim() !== '';
-    if (hasText) {
-      const body = el('div', 'draft__block-text');
-      body.setAttribute('aria-labelledby', labelId);
-      makeEditable(body, block.text, (text) => {
-        emit({ key: key, override: text });
-        emitChanged();
-      });
-      section.appendChild(body);
-    } else {
-      const gap = el('p', 'draft__block-gap');
-      gap.appendChild(
-        document.createTextNode('Not drafted yet. ')
-      );
-      const go = el('button', 'draft__recognition-link', cfg && cfg.part ? 'Draft this part' : 'Draft this part');
-      go.type = 'button';
-      go.addEventListener('click', () => {
-        showScreen(key === 'ft1' ? 'part1' : 'part2');
-      });
-      gap.appendChild(go);
-      section.appendChild(gap);
-    }
+      const hasText = block.text && block.text.trim() !== '';
+      if (hasText) {
+        const body = el('div', 'draft__block-text');
+        body.setAttribute('aria-labelledby', labelId);
+        makeEditable(body, block.text, (text) => {
+          emit({ freeText: { [key]: { override: text } } });
+          emitChanged();
+        });
+        section.appendChild(body);
+      } else {
+        const gap = el('p', 'draft__block-gap');
+        gap.appendChild(document.createTextNode('Not drafted yet. '));
+        const go = el('button', 'draft__recognition-link', 'Draft this part');
+        go.type = 'button';
+        go.addEventListener('click', () => {
+          showScreen(key === 'ft1' ? 'part1' : 'part2');
+        });
+        gap.appendChild(go);
+        section.appendChild(gap);
+      }
 
-    container.appendChild(section);
-  });
+      container.appendChild(section);
+    });
 
-  rootEl.appendChild(container);
+    rootEl.appendChild(container);
+  }
+
+  // The read-only readiness cheat-sheet — reminders of what to SELECT in the
+  // form (never pasteable prose, no Copy buttons).
+  rootEl.appendChild(renderCheatSheet(safe, 'assembly-cheatsheet'));
 }

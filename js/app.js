@@ -225,13 +225,14 @@ function renderRedirectScreen() {
 
 // Called by the Review section for a whole-block hand edit, captured as
 // draft.freeText[key].override so the composed prose is overridden but never
-// lost (TRD-3.3). The patch is { key:'ft1'|'ft2', override:string } — an empty
-// override string clears back to the composed text. draft.js dispatches
+// lost (TRD-3.3 / TRD-4.1). The patch is { freeText: { ft1?: { override },
+// ft2?: { override } } }; each present key is merged additively, and an empty
+// override string clears that key back to the composed text. draft.js dispatches
 // 'draft:changed' after the edit, so we only apply + persist here.
 function handleEdit(patch) {
-  if (!patch || typeof patch !== 'object') return;
-  const key = patch.key;
-  if (key !== 'ft1' && key !== 'ft2') return;
+  if (!patch || typeof patch !== 'object' || !patch.freeText || typeof patch.freeText !== 'object') {
+    return;
+  }
 
   if (!currentDraft.freeText || typeof currentDraft.freeText !== 'object') {
     currentDraft.freeText = {
@@ -239,12 +240,23 @@ function handleEdit(patch) {
       ft2: { answers: {}, override: null },
     };
   }
-  if (!currentDraft.freeText[key] || typeof currentDraft.freeText[key] !== 'object') {
-    currentDraft.freeText[key] = { answers: {}, override: null };
-  }
-  const text = patch.override == null ? '' : String(patch.override).trim();
-  currentDraft.freeText[key].override = text === '' ? null : text;
 
+  let touched = false;
+  ['ft1', 'ft2'].forEach(function (key) {
+    if (!Object.prototype.hasOwnProperty.call(patch.freeText, key)) return;
+    const sub = patch.freeText[key];
+    if (!sub || typeof sub !== 'object' || !Object.prototype.hasOwnProperty.call(sub, 'override')) {
+      return;
+    }
+    if (!currentDraft.freeText[key] || typeof currentDraft.freeText[key] !== 'object') {
+      currentDraft.freeText[key] = { answers: {}, override: null };
+    }
+    const text = sub.override == null ? '' : String(sub.override).trim();
+    currentDraft.freeText[key].override = text === '' ? null : text;
+    touched = true;
+  });
+
+  if (!touched) return;
   touch(currentDraft);
   saveDraft(currentDraft);
 }

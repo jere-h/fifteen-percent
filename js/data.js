@@ -196,6 +196,20 @@ export const parts = {
 };
 
 // ---------------------------------------------------------------------------
+// iras — the SINGLE source of the official report URL + when it was last checked
+// ---------------------------------------------------------------------------
+// The "Open the IRAS form" control (Transfer/End) and the saved document both
+// read this one object, so the destination never drifts and there is only one
+// place to update when IRAS moves the page. Opening it is plain user navigation
+// in a NEW TAB — no user data is ever placed in the URL, and the app never
+// submits or uploads anything. `lastVerified` replaces the old, deleted
+// transferMap.lastVerified marker.
+export const iras = {
+  reportUrl: "https://www.iras.gov.sg/contact-us/report-tax-evasion",
+  lastVerified: "2026-07-16",
+};
+
+// ---------------------------------------------------------------------------
 // money — the SINGLE honest source of every monetary phrase (TRD-3)
 // ---------------------------------------------------------------------------
 // Every S$ mention across the hero, the assembled draft, Transfer Mode and the
