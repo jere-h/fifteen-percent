@@ -403,6 +403,35 @@ p {
   transform: translateY(1px);
 }
 
+/* Primary, non-destructive way out of the Safety dialog. */
+.safety__done-wrap {
+  margin-top: var(--space-4);
+  display: flex;
+}
+
+.safety__done {
+  width: 100%;
+}
+
+/* The destructive Clear sits below the Done exit, set apart by a divider so it
+   is clearly a separate, deliberate action — not the way to close the dialog. */
+.safety__clear-wrap {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.safety__clear-note {
+  margin: 0;
+  font-size: .95rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
 /* -------------------------------------------------------------- Checklist */
 .checklist {
   display: flex;
@@ -1238,14 +1267,42 @@ body.modal-open {
 }
 
 .modal {
+  position: relative;
   width: min(100%, 560px);
   max-height: calc(100vh - var(--space-6));
   overflow-y: auto;
-  padding: var(--space-5);
+  padding: var(--space-6) var(--space-5) var(--space-5);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
+}
+
+/* Always-visible Close (×). Sticky to the modal's top-right so it stays
+   reachable even when a tall dialog scrolls. */
+.modal__close {
+  position: sticky;
+  top: 0;
+  float: right;
+  width: 40px;
+  height: 40px;
+  margin: calc(var(--space-4) * -1) calc(var(--space-3) * -1) 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.modal__close:hover,
+.modal__close:focus-visible {
+  border-color: var(--color-accent);
 }
 
 @media (prefers-reduced-motion: no-preference) {

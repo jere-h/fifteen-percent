@@ -12,6 +12,7 @@
 // renderAll(createEmptyDraft()).
 
 import { storageAvailable } from './store.js';
+import { closeModal } from './modal.js';
 
 // Honest, plain-language device-trail caveats. Local-only is not anonymous:
 // clearing this page does NOT erase these separate trails.
@@ -73,16 +74,29 @@ export function renderSafety(rootEl, onClear) {
       'span',
       'safety__disclaimer-help',
       canStore
-        ? 'Your answers are kept in this browser so you can close the tab and come back — they are never sent to any server. Anyone using this device could open them, so use "Clear my data" below when you are done.'
+        ? 'Your answers are kept in this browser so you can close the tab and come back — they are never sent to any server. Anyone using this device could open them, so use "Clear all my data" below when you are done.'
         : 'Storage is unavailable in this browser (private mode or full), so your work stays in memory only and will not survive a reload. Nothing is ever sent anywhere.'
     )
   );
   panel.appendChild(disclosure);
 
-  // --- One-tap Clear my data ---------------------------------------------
+  // --- Done: the clear, non-destructive way out (primary) ----------------
+  // Reading the safety notes should not feel like a dead end (the modal used to
+  // look closable only via "Clear my data"). This closes the dialog and returns
+  // the reader to where they were. The × in the corner does the same.
+  const doneWrap = el('div', 'safety__done-wrap');
+  const doneBtn = el('button', 'btn btn--primary safety__done', 'Done — back to where I was');
+  doneBtn.type = 'button';
+  doneBtn.addEventListener('click', () => {
+    closeModal();
+  });
+  doneWrap.appendChild(doneBtn);
+  panel.appendChild(doneWrap);
+
+  // --- Clear all my data (secondary, destructive) — kept well apart -------
   const clearWrap = el('div', 'safety__clear-wrap');
 
-  const clearBtn = el('button', 'safety__clear', 'Clear my data');
+  const clearBtn = el('button', 'safety__clear', 'Clear all my data');
   clearBtn.type = 'button';
   clearBtn.addEventListener('click', () => {
     if (typeof onClear === 'function') onClear();
