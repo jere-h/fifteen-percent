@@ -13,20 +13,22 @@
 //   - Expose renderAll(draft), used by the Safety panel's Clear to return the
 //     whole page to its empty state.
 
-import { createEmptyDraft, answeredCount, ANSWER_FIELDS } from './state.js';
+import { createEmptyDraft } from './state.js';
 import {
   load as loadDraft,
   save as saveDraft,
   clear as clearDraft,
-  isPersistenceEnabled,
-  storageAvailable,
 } from './store.js';
 import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
+import { renderRedirect } from './gate.js';
+import { renderPartHeaders, renderBuilder } from './builders.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
 import { renderSafety, renderSaveControl } from './safety.js';
 import { renderReckoner } from './reckoner.js';
+import { showScreen, setControls } from './router.js';
+import { openModal, closeModal } from './modal.js';
 
 // The one in-memory reportDraft this page treats as source of truth.
 let currentDraft = createEmptyDraft();
@@ -64,23 +66,45 @@ function updateHeroFigure(draft) {
       : money.ceilingPhrase;
 }
 
-// Reflect answered-count progress in the Checklist stepnav tab, e.g. "4/7"
-// after the index badge (TRD-11).
-function updateChecklistTab(draft) {
-  const tab = el('tab-checklist');
-  if (!tab) return;
-  const index = tab.querySelector('.stepnav__index');
-  const n = answeredCount(draft);
-  const total = ANSWER_FIELDS.length;
-  tab.textContent = '';
-  if (index) tab.appendChild(index);
-  else {
-    const span = document.createElement('span');
-    span.className = 'stepnav__index';
-    span.textContent = '1';
-    tab.appendChild(span);
+// Which Home phase-menu targets are currently reachable. A fresh draft can only
+// enter the Readiness check; the drafting phases (Part 1 / Part 2 / Review) stay
+// locked until the reader has been through the readiness check AND either passed
+// the advisory gate or explicitly chosen to continue past the redirect. This
+// keeps the Home menu consistent with the in-flow gate (TRD-2.4).
+function menuReachable(draft) {
+  const gate = (draft && draft.readiness && draft.readiness.gate) || {};
+  const readinessComplete = !!(
+    gate.evaluated && (gate.passed || gate.acknowledgedRedirect)
+  );
+  return {
+    readiness: true,
+    part1: readinessComplete,
+    part2: readinessComplete,
+    transfer: readinessComplete,
+  };
+}
+
+// Reflect reachability on the Home menu: enabled targets are actionable; locked
+// ones are disabled + aria-disabled, and a single hint explains why. Called from
+// both renderAll and the draft:changed path so returning Home after answering
+// shows freshly-unlocked phases.
+function updateMenuGating(draft) {
+  const reach = menuReachable(draft);
+  let anyLocked = false;
+  const items = document.querySelectorAll('.home__menu-item');
+  for (let i = 0; i < items.length; i++) {
+    const btn = items[i];
+    const enabled = !!reach[btn.dataset.target];
+    btn.disabled = !enabled;
+    if (enabled) {
+      btn.removeAttribute('aria-disabled');
+    } else {
+      btn.setAttribute('aria-disabled', 'true');
+      anyLocked = true;
+    }
   }
-  tab.appendChild(document.createTextNode(' Checklist ' + n + '/' + total));
+  const hint = el('home-menu-hint');
+  if (hint) hint.hidden = !anyLocked;
 }
 
 // Persist + recompute on band choice, then refresh the hero and dependent
@@ -105,40 +129,13 @@ function handleBand(bandId) {
   document.dispatchEvent(new CustomEvent('draft:changed'));
 }
 
-// Show a dismissible "welcome back" greeting when saving is on and prior
-// answers exist (TRD-11). Local-only; never appears when persistence is off.
-function maybeGreetReturn(draft) {
-  const host = el('welcome-back');
-  if (!host) return;
-  host.textContent = '';
-  const n = answeredCount(draft);
-  if (!(isPersistenceEnabled() && storageAvailable() && n > 0)) return;
-
-  const total = ANSWER_FIELDS.length;
-  const box = document.createElement('div');
-  box.className = 'welcome-back';
-  const msg = document.createElement('p');
-  msg.className = 'welcome-back__text';
-  msg.textContent =
-    "Welcome back — you've answered " + n + ' of ' + total + '. Picking up where you left off.';
-  box.appendChild(msg);
-
-  const dismiss = document.createElement('button');
-  dismiss.type = 'button';
-  dismiss.className = 'welcome-back__dismiss';
-  dismiss.setAttribute('aria-label', 'Dismiss welcome-back message');
-  dismiss.textContent = 'Dismiss';
-  dismiss.addEventListener('click', () => {
-    host.textContent = '';
-  });
-  box.appendChild(dismiss);
-
-  host.appendChild(box);
-}
-
-// Re-render only the sections that derive from the mutable answers/overrides:
-// the assembled draft and Transfer Mode. Cases are static; the checklist owns
-// its own interactive state; the safety panel is not answer-dependent.
+// Re-render only the sections that DERIVE from the mutable answers/overrides:
+// the assembled two-block Review and Transfer Mode. The checklist AND the two
+// free-text builders own their own interactive step state (rendered once in
+// renderAll), so they are deliberately NOT repainted here — that preserves
+// tap/focus place while their live previews and the Review update. The safety
+// panel is not answer-dependent. Hidden screens repaint offscreen so navigation
+// is instant.
 function renderDependent() {
   const draftEl = el('draft');
   if (draftEl) {
@@ -152,54 +149,142 @@ function renderDependent() {
       renderTransfer(transferEl, currentDraft);
     });
   }
+  updateMenuGating(currentDraft);
 }
 
-// Called by the checklist for each answered field. Update the in-memory draft
-// and persist (store.save is a no-op while persistence is off). The checklist
-// itself dispatches 'draft:changed', which drives the dependent re-render.
+// Called by the readiness check for each answered item. Fields prefixed
+// 'readiness.' route into draft.readiness.answers; any other field falls back to
+// the legacy draft.answers map (kept for back-compat). The checklist itself
+// dispatches 'draft:changed', which drives the dependent re-render.
 function handleChange(field, value) {
-  if (!currentDraft.answers || typeof currentDraft.answers !== 'object') {
-    currentDraft.answers = {};
+  // The free-text builders mutate draft.freeText[key].answers themselves (and
+  // persist), so here we only re-touch + persist as the orchestrator's belt-and-
+  // braces. The builder already dispatched 'draft:changed'.
+  if (typeof field === 'string' && field.indexOf('freeText.') === 0) {
+    touch(currentDraft);
+    saveDraft(currentDraft);
+    return;
   }
-  currentDraft.answers[field] = value;
+  if (typeof field === 'string' && field.indexOf('readiness.') === 0) {
+    if (!currentDraft.readiness || typeof currentDraft.readiness !== 'object') {
+      currentDraft.readiness = {
+        answers: {},
+        gate: { evaluated: false, passed: null, acknowledgedRedirect: false },
+      };
+    }
+    if (!currentDraft.readiness.answers || typeof currentDraft.readiness.answers !== 'object') {
+      currentDraft.readiness.answers = {};
+    }
+    currentDraft.readiness.answers[field.slice('readiness.'.length)] = value;
+  } else {
+    if (!currentDraft.answers || typeof currentDraft.answers !== 'object') {
+      currentDraft.answers = {};
+    }
+    currentDraft.answers[field] = value;
+  }
   touch(currentDraft);
   saveDraft(currentDraft);
 }
 
-// Called by the draft section for per-field inline edits, captured as
-// overrides so Transfer Mode can emit the hand-edited text. The patch may set
-// narrativeOverride and/or per-field entries under fieldOverrides (and, for
-// safety, direct answers). draft.js dispatches 'draft:changed' after the edit,
-// so we only apply + persist here and let the listener re-render.
+// Record that the reader chose to continue past the "gather this first" redirect
+// (or used the persistent Next on that screen). Sets the acknowledgement so the
+// Home menu unlocks the drafting Parts, then proceeds to Part 1.
+function acknowledgeRedirect() {
+  if (!currentDraft.readiness || typeof currentDraft.readiness !== 'object') {
+    currentDraft.readiness = { answers: {}, gate: {} };
+  }
+  if (!currentDraft.readiness.gate || typeof currentDraft.readiness.gate !== 'object') {
+    currentDraft.readiness.gate = {};
+  }
+  currentDraft.readiness.gate.evaluated = true;
+  currentDraft.readiness.gate.acknowledgedRedirect = true;
+  touch(currentDraft);
+  saveDraft(currentDraft);
+  updateMenuGating(currentDraft);
+  showScreen('part1');
+}
+
+// Paint the dynamic "gather this first" redirect body (naming the thin crucial
+// group) and mirror its "Continue anyway" onto the persistent Next control.
+function renderRedirectScreen() {
+  const screen = el('screen-redirect');
+  if (!screen) return;
+  safeRender('redirect', function () {
+    renderRedirect(screen, currentDraft, {
+      onContinue: acknowledgeRedirect,
+      onBackToMenu: function () {
+        showScreen('home');
+      },
+    });
+  });
+  setControls({
+    next: { label: 'Continue anyway →' },
+    onNext: acknowledgeRedirect,
+  });
+}
+
+// Called by the Review section for a whole-block hand edit, captured as
+// draft.freeText[key].override so the composed prose is overridden but never
+// lost (TRD-3.3 / TRD-4.1). The patch is { freeText: { ft1?: { override },
+// ft2?: { override } } }; each present key is merged additively, and an empty
+// override string clears that key back to the composed text. draft.js dispatches
+// 'draft:changed' after the edit, so we only apply + persist here.
 function handleEdit(patch) {
-  if (!patch || typeof patch !== 'object') return;
+  if (!patch || typeof patch !== 'object' || !patch.freeText || typeof patch.freeText !== 'object') {
+    return;
+  }
 
-  if (Object.prototype.hasOwnProperty.call(patch, 'narrativeOverride')) {
-    currentDraft.narrativeOverride = patch.narrativeOverride;
+  if (!currentDraft.freeText || typeof currentDraft.freeText !== 'object') {
+    currentDraft.freeText = {
+      ft1: { answers: {}, override: null },
+      ft2: { answers: {}, override: null },
+    };
   }
-  if (patch.fieldOverrides && typeof patch.fieldOverrides === 'object') {
-    currentDraft.fieldOverrides = Object.assign(
-      {},
-      currentDraft.fieldOverrides || {},
-      patch.fieldOverrides
-    );
-  }
-  if (patch.answers && typeof patch.answers === 'object') {
-    currentDraft.answers = Object.assign(
-      {},
-      currentDraft.answers || {},
-      patch.answers
-    );
-  }
+
+  let touched = false;
+  ['ft1', 'ft2'].forEach(function (key) {
+    if (!Object.prototype.hasOwnProperty.call(patch.freeText, key)) return;
+    const sub = patch.freeText[key];
+    if (!sub || typeof sub !== 'object' || !Object.prototype.hasOwnProperty.call(sub, 'override')) {
+      return;
+    }
+    if (!currentDraft.freeText[key] || typeof currentDraft.freeText[key] !== 'object') {
+      currentDraft.freeText[key] = { answers: {}, override: null };
+    }
+    const text = sub.override == null ? '' : String(sub.override).trim();
+    currentDraft.freeText[key].override = text === '' ? null : text;
+    touched = true;
+  });
+
+  if (!touched) return;
   touch(currentDraft);
   saveDraft(currentDraft);
 }
 
-// Wired to the Safety panel's "Clear my data" button. Remove any persisted
-// copy, then re-render the whole page from a fresh empty draft.
+// Wired to the Safety panel's "Clear my data" button. Close the safety dialog
+// (which returns #safety to its off-screen host), remove any persisted copy,
+// re-render the whole page from a fresh empty draft, and land back on Home.
 function handleClear() {
+  closeModal();
   clearDraft();
   renderAll(createEmptyDraft());
+  showScreen('home');
+}
+
+// Open the full safety/privacy panel inside the accessible modal, reached from
+// Home's quiet Privacy link. renderSafety paints into #safety (off-screen host)
+// first, then the modal borrows that node and returns it on close.
+function openSafetyModal() {
+  const safetyEl = el('safety');
+  if (!safetyEl) return;
+  safeRender('safety', function () {
+    renderSafety(safetyEl, handleClear);
+  });
+  openModal({
+    titleId: 'safety-panel-title',
+    contentNode: safetyEl,
+    invoker: el('home-privacy'),
+  });
 }
 
 // Public entry: render every non-reckoner section from the given draft and
@@ -222,7 +307,27 @@ export function renderAll(draft) {
       renderChecklist(checklistEl, currentDraft, handleChange);
     });
   }
-  updateChecklistTab(currentDraft);
+
+  // Timeboxed Part headers (Part 1 / Part 2) are single-sourced from data.js.
+  safeRender('part-headers', function () {
+    renderPartHeaders();
+  });
+
+  // The two free-text builders own their own stepper state, so they render once
+  // here (not in renderDependent) and survive the draft:changed re-render just
+  // like the checklist does.
+  const ft1El = el('builder-ft1');
+  if (ft1El) {
+    safeRender('builder-ft1', function () {
+      renderBuilder(ft1El, currentDraft, 'ft1', handleChange);
+    });
+  }
+  const ft2El = el('builder-ft2');
+  if (ft2El) {
+    safeRender('builder-ft2', function () {
+      renderBuilder(ft2El, currentDraft, 'ft2', handleChange);
+    });
+  }
 
   const saveControlEl = el('save-control');
   if (saveControlEl) {
@@ -255,15 +360,26 @@ function boot() {
   }
 
   renderAll(currentDraft);
-  maybeGreetReturn(currentDraft);
+
+  // Home's quiet Privacy link opens the full safety panel as an accessible
+  // dialog. Wired once on boot; the button lives in the persistent Home screen.
+  const privacyBtn = el('home-privacy');
+  if (privacyBtn) privacyBtn.addEventListener('click', openSafetyModal);
 
   // Any section that mutates the draft (checklist, draft edits, and the
   // standalone reckoner) dispatches 'draft:changed' on document. Re-render the
-  // dependent sections only, so we never clobber active tap/focus state, and
-  // keep the checklist tab progress badge in sync.
+  // dependent sections only, so we never clobber active tap/focus state.
   document.addEventListener('draft:changed', function () {
     renderDependent();
-    updateChecklistTab(currentDraft);
+  });
+
+  // The redirect screen's body depends on the live gate result, so (re)paint it
+  // on entry. Fired by the router after it applies the default control bar, so
+  // renderRedirectScreen's setControls override wins.
+  document.addEventListener('screen:changed', function (e) {
+    if (e && e.detail && e.detail.name === 'redirect') {
+      renderRedirectScreen();
+    }
   });
 }
 

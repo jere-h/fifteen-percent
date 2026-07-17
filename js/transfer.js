@@ -1,210 +1,30 @@
-// transfer.js — Transfer Mode
+// transfer.js — Transfer / End: the copy-into-the-form surface (IP-4).
 //
-// Pairs each IRAS informant form-field label (from the inlined
-// data.transferMap) with the matching chunk of the assembled report,
-// PREFERRING the user's per-field edit (draft.fieldOverrides[draftKey]) or
-// narrativeOverride when present, so hand-edits are never discarded.
+// The OLD hallucinated per-field mapping (one invented "IRAS field label" per
+// checklist answer, keyed off transferMap) is GONE. The real, honest output is:
+//   - TWO prominent Copy blocks, one per hard free-text field (FT-1 "what
+//     happened", FT-2 "how/when you became aware"), each headed with its EXACT
+//     form field name so the reader knows exactly where to paste it;
+//   - a READ-ONLY readiness cheat-sheet (reminders of what to SELECT in the
+//     form — never pasteable prose, no Copy buttons);
+//   - a "You're ready" recognition block with the honest reward phrase and the
+//     three next steps (paste / select / attach);
+//   - a local Save-as-document download (no network) and an Open-IRAS new-tab
+//     link (plain navigation, no user data in the URL).
 //
-// Every value is copyable: a per-field "Copy" button and a single
-// "Copy all as text" fallback both go through clipboard.writeText and show the
-// "Copied" toast ONLY when the clipboard actually reported success. When it
-// fails (blocked / insecure / file:// context) we surface a
-// "Copy failed - select and copy manually" state and drop a selectable text
-// block the user can highlight by hand.
+// This module never contacts, submits to, or uploads anything to IRAS. Copying
+// is a local clipboard write; saving is a local Blob/data-URI download; opening
+// IRAS is user navigation in a new tab.
 //
-// This is manual copy-paste only. Nothing here ever contacts or auto-submits
-// to IRAS.
+// Contract (UNCHANGED signature): export function renderTransfer(rootEl, draft).
 
-import { transferMap, money, evidenceAttachments } from './data.js';
+import { buildNarrative, renderCheatSheet } from './draft.js';
+import { evidenceAttachments, money, iras } from './data.js';
+import { downloadDocument } from './save-doc.js';
 import { writeText } from './clipboard.js';
-import { buildNarrative } from './draft.js';
+import { showScreen } from './router.js';
 
-let toastTimer = null;
-
-// ---------------------------------------------------------------------------
-// Value resolution
-// ---------------------------------------------------------------------------
-
-function formatMoney(n) {
-  if (typeof n !== 'number' || !isFinite(n)) return '';
-  return money.format(n);
-}
-
-function formatAnswer(val, formatter) {
-  if (val == null) return '';
-  if (Array.isArray(val)) {
-    if (val.length === 0) return '';
-    if (formatter === 'list') return val.map((v) => '- ' + String(v)).join('\n');
-    return val.map(String).join(', ');
-  }
-  const s = String(val).trim();
-  return s;
-}
-
-// Resolve one transferMap field to its final text, honouring the override
-// precedence: per-field edit > narrativeOverride (for the statement chunk) >
-// derived draft value.
-function resolveValue(draft, field) {
-  const draftKey = field.draftKey;
-  const fo = draft && draft.fieldOverrides;
-
-  // 1. Explicit per-field hand-edit always wins.
-  if (fo && Object.prototype.hasOwnProperty.call(fo, draftKey)) {
-    const ov = fo[draftKey];
-    if (ov != null && String(ov).trim() !== '') return String(ov);
-  }
-
-  // 2. The free-text statement chunk prefers the whole-narrative override.
-  if (
-    draftKey === 'narrative' ||
-    draftKey === 'statement' ||
-    draftKey === 'paragraph' ||
-    draftKey === 'summary'
-  ) {
-    if (draft && draft.narrativeOverride && draft.narrativeOverride.trim() !== '') {
-      return draft.narrativeOverride;
-    }
-    try {
-      const n = buildNarrative(draft);
-      if (n && n.paragraph) return n.paragraph;
-    } catch (e) {
-      /* fall through to empty */
-    }
-    return '';
-  }
-
-  // 3. The derived discretionary reward figure.
-  if (
-    draftKey === 'reward' ||
-    draftKey === 'rewardEstimate' ||
-    draftKey === 'estimatedReward'
-  ) {
-    const r = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
-    return typeof r === 'number' && isFinite(r) ? formatMoney(r) : '';
-  }
-
-  // 4. Otherwise a plain checklist answer.
-  const answers = draft && draft.answers ? draft.answers : {};
-  if (Object.prototype.hasOwnProperty.call(answers, draftKey)) {
-    return formatAnswer(answers[draftKey], field.formatter);
-  }
-  return '';
-}
-
-function buildAllText(draft) {
-  const fields = (transferMap && transferMap.fields) || [];
-  return fields
-    .map((f) => {
-      const v = resolveValue(draft, f);
-      return f.irasLabel + ':\n' + (v || '(not provided yet)');
-    })
-    .join('\n\n');
-}
-
-// ---------------------------------------------------------------------------
-// Toast + selectable fallback
-// ---------------------------------------------------------------------------
-
-// Immediate, honest, SYNCHRONOUS feedback the instant a Copy button is pressed.
-// The clipboard call is asynchronous, so without this the click handler would
-// mutate no DOM until its promise settles a tick later — leaving a probe (and a
-// human) staring at an apparently dead button. We show a neutral "Copying..."
-// state right away (no success claim yet), then showToast() replaces it with
-// the truthful Copied / Copy failed result once writeText actually resolves.
-function pendingToast(root) {
-  const toast = root.querySelector('.toast');
-  if (!toast) return;
-  if (toastTimer) {
-    clearTimeout(toastTimer);
-    toastTimer = null;
-  }
-  toast.classList.remove('toast--copied', 'toast--failed');
-  toast.textContent = 'Copying...';
-}
-
-function showToast(root, ok) {
-  const toast = root.querySelector('.toast');
-  if (!toast) return;
-  toast.classList.remove('toast--copied', 'toast--failed');
-  toast.textContent = ok ? 'Copied' : 'Copy failed - select and copy manually';
-  toast.classList.add(ok ? 'toast--copied' : 'toast--failed');
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(
-    () => {
-      toast.classList.remove('toast--copied', 'toast--failed');
-      toast.textContent = '';
-    },
-    ok ? 2400 : 6000
-  );
-}
-
-// Neutral, honest state for a copy request with nothing to copy — never claims
-// "Copied" when the clipboard was untouched (TRD-16).
-function showNeutralToast(root, message) {
-  const toast = root.querySelector('.toast');
-  if (!toast) return;
-  toast.classList.remove('toast--copied', 'toast--failed');
-  toast.textContent = message;
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toast.textContent = '';
-  }, 2400);
-}
-
-// Reveal a selectable, read-only text block so the user can highlight + copy
-// by hand when the clipboard API is unavailable. Built on demand (never
-// shipped hidden at rest) and cleared on the next render.
-function revealSelectable(hostEl, text) {
-  let ta = hostEl.querySelector('.transfer__value--fallback');
-  if (!ta) {
-    ta = document.createElement('textarea');
-    ta.className = 'transfer__value transfer__value--fallback';
-    ta.setAttribute('readonly', '');
-    ta.setAttribute('aria-label', 'Select this text and copy it manually');
-    hostEl.appendChild(ta);
-  }
-  const lines = String(text).split('\n').length;
-  ta.rows = Math.min(10, Math.max(2, lines));
-  ta.value = text;
-  try {
-    ta.focus();
-    ta.select();
-  } catch (e) {
-    /* selection is best-effort */
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Copy handlers
-// ---------------------------------------------------------------------------
-
-async function doCopy(root, hostEl, text) {
-  // Nothing to copy: never send an empty payload to the clipboard (which would
-  // resolve true and falsely toast "Copied"). Give a neutral response (TRD-16).
-  if (text == null || String(text).trim() === '') {
-    showNeutralToast(root, 'Nothing to copy yet');
-    return;
-  }
-
-  // Paint the pending state synchronously, inside the click's own turn, so the
-  // confirmation UI is visible immediately rather than after the async call.
-  pendingToast(root);
-
-  let ok = false;
-  try {
-    ok = await writeText(text);
-  } catch (e) {
-    ok = false;
-  }
-  showToast(root, ok === true);
-  if (ok !== true) {
-    revealSelectable(hostEl, text);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Render
-// ---------------------------------------------------------------------------
+const KEYS = ['ft1', 'ft2'];
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -213,208 +33,305 @@ function el(tag, className, text) {
   return node;
 }
 
-function goToChecklist() {
-  const tab = document.getElementById('tab-checklist');
-  if (tab) tab.click();
+function announce(message) {
+  const live = document.getElementById('sr-live');
+  if (live) live.textContent = message;
 }
 
-// Build the closing "you're ready — paste and attach these files" block (TRD-17).
-// Read-only, derived from answers; no upload or submit affordance.
-function buildReadyBlock(draft, readyCount, total) {
-  const section = el('section', 'transfer__ready');
+// -------------------------------------------------------------------- toast
+// One shared, accessible toast (role=status, aria-live=polite). Every message is
+// honest: "Copied" shows ONLY after writeText resolves true; a failure shows
+// "Copy failed…" and selects the on-screen text so the reader can copy it by
+// hand; an empty block shows the neutral "Nothing to copy yet".
 
-  const done = readyCount === total;
-  const cue = el('p', 'transfer__ready-cue');
-  cue.setAttribute('role', 'status');
-  cue.textContent = done
-    ? "You're ready. Every field above is filled — here is how to hand it over."
-    : "Almost there. You can hand over what you have now, or finish the checklist first.";
-  section.appendChild(cue);
+let toastEl = null;
+let toastTimer = null;
 
-  // Personalised reward phrase from the single money source.
-  const est = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
-  const reward = el('p', 'transfer__ready-reward');
-  reward.textContent =
-    typeof est === 'number' && isFinite(est) && est > 0
-      ? 'If IRAS recovers tax from this, the reward is ' + money.phrase(est) + '.'
-      : 'If IRAS recovers tax from this, the reward is ' +
-        money.ceilingPhrase +
-        ', ' +
-        money.caveat +
-        '.';
-  section.appendChild(reward);
+function ensureToast() {
+  if (toastEl && document.body && document.body.contains(toastEl)) return toastEl;
+  toastEl = el('div', 'toast');
+  toastEl.setAttribute('role', 'status');
+  toastEl.setAttribute('aria-live', 'polite');
+  if (document.body) document.body.appendChild(toastEl);
+  return toastEl;
+}
 
-  section.appendChild(el('p', 'transfer__ready-title', 'Next, on your own:'));
-  const steps = el('ol', 'transfer__ready-steps');
-  steps.appendChild(
-    el('li', null, 'Open the official IRAS informant form in your own browser.')
-  );
-  steps.appendChild(
-    el('li', null, 'Paste each field above into its matching form field.')
-  );
-  section.appendChild(steps);
+function paintToast(variant, message) {
+  const t = ensureToast();
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  t.className = 'toast toast--' + variant;
+  t.textContent = '';
+  t.appendChild(el('span', 'toast__text', message));
+  announce(message);
+  toastTimer = setTimeout(function () {
+    t.className = 'toast';
+    toastTimer = null;
+  }, 3200);
+}
 
-  // Attachment checklist derived from the evidence answer.
-  const evidence = draft && draft.answers ? draft.answers.evidenceInHand : null;
-  if (Array.isArray(evidence) && evidence.length) {
-    const attachable = [];
-    const notes = [];
-    evidence.forEach((item) => {
-      const map = evidenceAttachments[item];
-      if (map && map.attach) attachable.push(map.text);
-      else if (map) notes.push(map.text);
-      else attachable.push(String(item).toLowerCase());
-    });
+function showToast(message) {
+  paintToast('copied', message);
+}
 
-    if (attachable.length) {
-      section.appendChild(
-        el('p', 'transfer__ready-title', 'Bring these files to attach:')
-      );
-      const ul = el('ul', 'transfer__attach');
-      attachable.forEach((t) => ul.appendChild(el('li', null, t)));
-      section.appendChild(ul);
+function showFailedToast(message) {
+  paintToast('failed', message);
+}
+
+function showNeutralToast(message) {
+  paintToast('neutral', message);
+}
+
+// Select the on-screen text of a Copy block so the reader can copy it manually
+// when the clipboard write is blocked (file:// with no permission, etc.).
+function revealSelectable(textEl) {
+  if (!textEl) return;
+  try {
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    range.selectNodeContents(textEl);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (typeof textEl.focus === 'function') {
+      textEl.setAttribute('tabindex', '-1');
+      textEl.focus();
     }
-    notes.forEach((n) => {
-      section.appendChild(el('p', 'transfer__attach-note', n));
+  } catch (e) {
+    /* selection is a best-effort fallback */
+  }
+}
+
+// The single copy path. Honest by construction: empty -> neutral toast, never
+// "Copied"; a real write -> "Copied" only on a true resolution; a failure ->
+// "Copy failed" + selectable fallback.
+function doCopy(text, textEl) {
+  const value = text == null ? '' : String(text).trim();
+  if (value === '') {
+    showNeutralToast('Nothing to copy yet');
+    return;
+  }
+  Promise.resolve(writeText(value)).then(
+    function (ok) {
+      if (ok) {
+        showToast('Copied');
+      } else {
+        showFailedToast('Copy failed — the text is selected, press ' + copyChord() + ' to copy it');
+        revealSelectable(textEl);
+      }
+    },
+    function () {
+      showFailedToast('Copy failed — the text is selected, press ' + copyChord() + ' to copy it');
+      revealSelectable(textEl);
+    }
+  );
+}
+
+function copyChord() {
+  const mac =
+    typeof navigator !== 'undefined' && /Mac|iP(hone|ad|od)/.test(navigator.platform || '');
+  return mac ? '⌘C' : 'Ctrl+C';
+}
+
+// ------------------------------------------------------------- content bits
+
+// The honest reward phrase from the single money source (personalised when the
+// reckoner has an estimate, else the generic ceiling), always with the
+// discretion caveat.
+function rewardPhrase(draft) {
+  const est = draft && draft.reckoner ? draft.reckoner.rewardEstimate : null;
+  if (typeof est === 'number' && isFinite(est) && est > 0) {
+    return money.phrase(est);
+  }
+  return money.ceilingPhrase + ", at IRAS's discretion, never a promise";
+}
+
+// The attachments reminder, derived from the readiness evidence multi-select.
+function attachmentSummary(draft) {
+  const ev =
+    (draft && draft.readiness && draft.readiness.answers && draft.readiness.answers.evidence) ||
+    [];
+  const list = Array.isArray(ev) ? ev : [];
+  const attachables = [];
+  list.forEach((opt) => {
+    const meta = evidenceAttachments[opt];
+    if (meta && meta.attach) attachables.push(meta.text);
+  });
+  if (attachables.length) {
+    return 'Attach your ' + attachables.join(', ') + '.';
+  }
+  return 'You noted nothing to attach — your account in the summary is the record.';
+}
+
+// One Copy block for a free-text field: exact form-field heading, the composed
+// text (selectable), and a Copy button.
+function buildCopyBlock(key, block) {
+  const section = el('section', 'transfer__block');
+
+  const headId = 'transfer-block-head-' + key;
+  const heading = el('h3', 'transfer__block-head');
+  heading.id = headId;
+  heading.appendChild(document.createTextNode('Copy, then paste into the form field: '));
+  heading.appendChild(el('span', 'transfer__block-field', '“' + block.label + '”'));
+  section.appendChild(heading);
+
+  const hasText = block.text && block.text.trim() !== '';
+
+  const textEl = el('div', 'transfer__block-text');
+  textEl.setAttribute('aria-labelledby', headId);
+  if (hasText) {
+    textEl.textContent = block.text;
+  } else {
+    textEl.classList.add('transfer__block-text--empty');
+    textEl.textContent = 'Not drafted yet.';
+  }
+  section.appendChild(textEl);
+
+  const actions = el('div', 'transfer__block-actions');
+  const copyBtn = el('button', 'transfer__copy', 'Copy this block');
+  copyBtn.type = 'button';
+  copyBtn.setAttribute('aria-label', 'Copy the text for the form field: ' + block.label);
+  copyBtn.addEventListener('click', function () {
+    doCopy(hasText ? block.text : '', textEl);
+  });
+  actions.appendChild(copyBtn);
+
+  if (!hasText) {
+    const go = el('button', 'transfer__recognition-link', 'Draft this part');
+    go.type = 'button';
+    go.addEventListener('click', function () {
+      showScreen(key === 'ft1' ? 'part1' : 'part2');
     });
+    actions.appendChild(go);
   }
 
+  section.appendChild(actions);
   return section;
 }
 
+// ------------------------------------------------------------- renderTransfer
+
+/**
+ * Render the Transfer / End screen into rootEl (#transfer).
+ * @param {HTMLElement} rootEl
+ * @param {object} draft
+ */
 export function renderTransfer(rootEl, draft) {
   if (!rootEl) return;
+  const safe = draft || {};
   rootEl.innerHTML = '';
 
-  const wrap = document.createElement('div');
-  wrap.className = 'transfer';
+  const model = buildNarrative(safe);
+  const filled = KEYS.filter((k) => model[k].text && model[k].text.trim() !== '');
+  const bothReady = filled.length === KEYS.length;
 
-  // Header kept together, full-width above the field grid (TRD-14).
+  // --- Header -------------------------------------------------------------
   const header = el('header', 'transfer__header');
-  header.appendChild(el('p', 'eyebrow', 'Transfer mode'));
-  const heading = el('h2', null, 'Copy into the IRAS form yourself');
+  header.appendChild(el('p', 'eyebrow', 'Copy into the form'));
+  const heading = el('h2', null, 'Your two blocks, ready to paste');
   heading.id = 'transfer-heading';
-  heading.tabIndex = -1; // TRD-8 focus target on view switch
+  heading.tabIndex = -1; // focus target on view switch (router)
   header.appendChild(heading);
   header.appendChild(
     el(
       'p',
-      null,
-      'Each row below matches one field on the IRAS informant form. Copy the value across yourself when you are ready. This tool never sends anything to IRAS and never submits on your behalf.'
+      'transfer__intro',
+      'Copy each block into its matching field on the IRAS form. This tool never sends anything to IRAS and never submits on your behalf.'
     )
   );
-  wrap.appendChild(header);
+  rootEl.appendChild(header);
 
-  const fields = (transferMap && transferMap.fields) || [];
-  const total = fields.length;
-  let readyCount = 0;
-
-  // Recognition line — count of ready fields with a path back (TRD-15).
-  const recognition = el('p', 'transfer__recognition');
-  recognition.setAttribute('role', 'status');
-  wrap.appendChild(recognition);
-
-  const list = document.createElement('div');
-  list.className = 'transfer__fields';
-
-  const emptyFields = [];
-
-  fields.forEach((field) => {
-    const value = resolveValue(draft, field);
-
-    if (!value) {
-      emptyFields.push(field);
-      return; // de-emphasised empties are collected below, not shown as a wall
-    }
-
-    readyCount += 1;
-
-    const row = el('div', 'transfer__field');
-    row.appendChild(el('div', 'transfer__label', field.irasLabel));
-
-    const valueEl = el('div', 'transfer__value', value);
-    row.appendChild(valueEl);
-
-    const copyBtn = el('button', 'transfer__copy', 'Copy');
-    copyBtn.type = 'button';
-    copyBtn.setAttribute('aria-label', 'Copy the value for ' + field.irasLabel);
-    copyBtn.addEventListener('click', () => {
-      doCopy(wrap, row, value);
-    });
-    row.appendChild(copyBtn);
-
-    list.appendChild(row);
+  // --- The two Copy blocks ------------------------------------------------
+  const fields = el('div', 'transfer__blocks');
+  KEYS.forEach((key) => {
+    fields.appendChild(buildCopyBlock(key, model[key]));
   });
+  rootEl.appendChild(fields);
 
-  wrap.appendChild(list);
+  // --- Read-only cheat-sheet (no Copy buttons) ----------------------------
+  rootEl.appendChild(renderCheatSheet(safe, 'transfer-cheatsheet'));
 
-  recognition.textContent = '';
-  recognition.appendChild(
-    document.createTextNode(readyCount + ' of ' + total + ' ready. ')
-  );
-  if (readyCount < total) {
-    const back = el('button', 'transfer__recognition-link', 'Finish the checklist');
-    back.type = 'button';
-    back.addEventListener('click', goToChecklist);
-    recognition.appendChild(back);
-    recognition.appendChild(
-      document.createTextNode(' to fill the rest.')
-    );
+  // --- You're ready + next steps + Save / Open actions (TRD-4.5/4.6) ------
+  const ready = el('section', 'transfer__ready');
+
+  const cue = el('p', 'transfer__ready-cue');
+  cue.setAttribute('role', 'status');
+  if (bothReady) {
+    cue.textContent = "You’re ready — both blocks are drafted.";
   } else {
-    recognition.appendChild(
-      document.createTextNode('Everything is filled in.')
-    );
-  }
-
-  // Collapsed disclosure of the not-yet-filled fields, de-emphasised rather
-  // than an equal wall of "Not provided yet" (TRD-15/16).
-  if (emptyFields.length) {
-    const details = document.createElement('details');
-    details.className = 'transfer__empty-wrap';
-    const summary = document.createElement('summary');
-    summary.className = 'transfer__empty-summary';
-    summary.textContent = 'Not yet filled (' + emptyFields.length + ')';
-    details.appendChild(summary);
-    emptyFields.forEach((field) => {
-      const row = el('div', 'transfer__field transfer__field--empty');
-      row.appendChild(el('div', 'transfer__label', field.irasLabel));
-      const v = el('div', 'transfer__value', 'Not provided yet');
-      v.setAttribute('data-empty', 'true');
-      row.appendChild(v);
-      details.appendChild(row);
+    cue.textContent =
+      filled.length + ' of ' + KEYS.length + ' blocks drafted. You can still save and open the form.';
+    const link = el('button', 'transfer__recognition-link', 'Finish the other part');
+    link.type = 'button';
+    link.addEventListener('click', function () {
+      showScreen(model.ft1.text.trim() !== '' ? 'part2' : 'part1');
     });
-    wrap.appendChild(details);
+    cue.appendChild(document.createTextNode(' '));
+    cue.appendChild(link);
   }
+  ready.appendChild(cue);
 
-  // Whole-report fallback (only useful once something is filled).
-  const copyAll = el('button', 'transfer__copy-all', 'Copy all as text');
-  copyAll.type = 'button';
-  copyAll.addEventListener('click', () => {
-    doCopy(wrap, wrap, buildAllText(draft));
-  });
-  wrap.appendChild(copyAll);
-
-  // Closing recognition + attachment guidance (TRD-17).
-  wrap.appendChild(buildReadyBlock(draft, readyCount, total));
-
-  // Live status toast (empty at rest, so no hidden text ships).
-  const toast = el('div', 'toast');
-  toast.setAttribute('role', 'status');
-  toast.setAttribute('aria-live', 'polite');
-  wrap.appendChild(toast);
-
-  // Provenance marker for the field mapping.
-  const when =
-    transferMap && transferMap.lastVerified
-      ? transferMap.lastVerified
-      : 'an unrecorded date';
-  wrap.appendChild(
+  ready.appendChild(
     el(
       'p',
-      'transfer__verified',
-      'Field mapping last verified on ' + when + '. Manual copy-paste only.'
+      'transfer__ready-reward',
+      'If IRAS recovers tax, an informant reward is possible: ' + rewardPhrase(safe) + '.'
     )
   );
 
-  rootEl.appendChild(wrap);
+  ready.appendChild(el('p', 'transfer__ready-title', 'Three steps on the form:'));
+  const steps = el('ol', 'transfer__ready-steps');
+  const step1 = el('li');
+  step1.appendChild(document.createTextNode('Paste block 1 into '));
+  step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft1.label + '”'));
+  step1.appendChild(document.createTextNode(', and block 2 into '));
+  step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft2.label + '”'));
+  step1.appendChild(document.createTextNode('.'));
+  steps.appendChild(step1);
+  steps.appendChild(el('li', null, 'Select the simple fields shown in your cheat-sheet above.'));
+  const step3 = el('li');
+  step3.appendChild(document.createTextNode('Attach your supporting files. ' + attachmentSummary(safe)));
+  steps.appendChild(step3);
+  ready.appendChild(steps);
+
+  // Actions: Save (local download) + Open IRAS (new tab). Neither transmits.
+  const actions = el('div', 'transfer__actions');
+
+  const saveBtn = el('button', 'btn btn--secondary transfer__save', 'Save my report as a document');
+  saveBtn.type = 'button';
+  const saveStatus = el('p', 'transfer__save-status');
+  saveStatus.setAttribute('role', 'status');
+  saveStatus.setAttribute('aria-live', 'polite');
+  saveBtn.addEventListener('click', function () {
+    const ok = downloadDocument(safe);
+    if (ok) {
+      saveStatus.textContent =
+        'Saved to your device as fifteen-percent-report.txt — nothing was sent anywhere.';
+    } else {
+      saveStatus.textContent =
+        'Could not start the download in this browser. Copy each block above instead.';
+    }
+  });
+  actions.appendChild(saveBtn);
+
+  const openLink = el('a', 'btn btn--primary transfer__open', 'Open the IRAS form');
+  openLink.href = iras.reportUrl;
+  openLink.target = '_blank';
+  openLink.rel = 'noopener noreferrer';
+  actions.appendChild(openLink);
+
+  ready.appendChild(actions);
+  ready.appendChild(saveStatus);
+
+  ready.appendChild(
+    el(
+      'p',
+      'transfer__attach-note',
+      'The IRAS form opens in a new tab. Independent tool — not affiliated with IRAS. This app never submits or uploads anything for you; you paste and attach everything yourself.'
+    )
+  );
+
+  rootEl.appendChild(ready);
 }

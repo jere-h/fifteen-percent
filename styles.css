@@ -147,145 +147,137 @@ textarea {
 }
 
 /* --------------------------------------------------------------- Layout */
+/* App shell: a fixed-height flex column pinned to the viewport. The screen
+   content pane (main) scrolls internally when a populated screen is taller than
+   the viewport, so document.body itself never scrolls — body.scrollHeight stays
+   <= viewport height on every screen (TRD-1.1) — and the persistent control bar
+   stays visible at the bottom without relying on sticky positioning. */
 #app {
   max-width: min(100%, 1120px);
   margin: 0 auto;
-  padding: var(--space-5) var(--space-4) var(--space-7);
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--space-3) var(--space-4) 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  overflow: hidden;
+}
+
+#app > main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .section {
   scroll-margin-top: var(--space-5);
 }
 
-/* ------------------------------------------------------------- Safety wrap */
-/* The persistent safety/privacy panel is honest and important, but it isn't
-   one of the four working screens — collapse it out of the way by default so
-   it doesn't push the actual content down the page on every visit. */
-.safety-wrap {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-}
-
-.safety-wrap__summary {
-  list-style: none;
-  cursor: pointer;
-  min-height: 44px;
+/* ------------------------------------------------------------- Screens */
+/* One screen at a time. Exactly one .screen is visible; the rest are [hidden].
+   Each screen is a compact single-column stack designed to fit a 390x844
+   viewport above the persistent control bar (no vertical scroll on the working
+   screens). */
+.screen {
   display: flex;
-  align-items: center;
-  padding: var(--space-3) var(--space-4);
-  font-weight: 600;
-  font-size: 1rem;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.safety-wrap__summary::-webkit-details-marker {
+.screen[hidden] {
   display: none;
 }
 
-.safety-wrap__summary::before {
-  content: "▸";
-  display: inline-block;
-  margin-right: var(--space-2);
-  transition: transform .2s var(--ease-soft);
+.screen__lead {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--color-fg);
+  max-width: 62ch;
 }
 
-.safety-wrap[open] .safety-wrap__summary::before {
-  transform: rotate(90deg);
-}
-
-.safety-wrap #safety {
-  padding: 0 var(--space-4) var(--space-4);
-}
-
-/* ---------------------------------------------------------------- Stepnav */
-/* Four screens, one at a time — the fix for the "one long scrolling page"
-   problem: each PRD scene (hook / checklist / assembly / transfer) is its own
-   view, and the stepnav is the only thing always on screen alongside it. */
-.stepnav {
+/* ------------------------------------------------- Persistent control bar */
+/* Back / Menu / Next: always on screen, always reachable by keyboard. Sticks
+   to the viewport bottom so it stays visible even when a screen's content is
+   taller than the viewport (e.g. a populated Home). */
+#screen-controls {
   position: sticky;
-  top: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  padding: var(--space-2);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-}
-
-.stepnav__tab {
-  min-width: 0;
-  min-height: 44px;
+  bottom: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  text-align: center;
-  white-space: normal;
-  padding: var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-muted);
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) 0;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+}
+
+.screen-controls__back,
+.screen-controls__menu,
+.screen-controls__next {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
   font-weight: 600;
   font-size: 1rem;
   line-height: 1.2;
   cursor: pointer;
-  transition: background .2s var(--ease-soft), color .2s var(--ease-soft);
+  transition: filter .2s var(--ease-soft), border-color .2s var(--ease-soft), background .2s var(--ease-soft);
 }
 
-.stepnav__tab:hover,
-.stepnav__tab:focus-visible {
+.screen-controls__back {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.screen-controls__menu {
+  margin: 0 auto;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+.screen-controls__next {
+  border: 1px solid var(--color-accent-strong);
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.screen-controls__back:hover,
+.screen-controls__back:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.screen-controls__menu:hover,
+.screen-controls__menu:focus-visible {
   border-color: var(--color-border);
 }
 
-.stepnav__tab[aria-selected="true"] {
-  background: var(--color-accent-strong);
-  color: var(--color-on-accent);
-}
-
-.stepnav__index {
-  display: inline-block;
-  margin-right: var(--space-1);
-  font-family: var(--font-mono);
-}
-
-/* ------------------------------------------------------------------ Views */
-.view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.view[hidden] {
-  display: none;
-}
-
-.view__next {
-  align-self: center;
-  min-height: 44px;
-  padding: var(--space-3) var(--space-6);
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-strong);
-  color: var(--color-on-accent);
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter .2s var(--ease-soft), transform .12s var(--ease-soft);
-}
-
-.view__next:hover,
-.view__next:focus-visible {
+.screen-controls__next:hover,
+.screen-controls__next:focus-visible {
   filter: brightness(1.06);
 }
 
-.view__next:active {
-  transform: translateY(1px);
+/* Inert control-bar buttons keep the native focus ring and tab stop (they use
+   aria-disabled, not the native `disabled` property) but read as unavailable and
+   suppress hover affordances. */
+.screen-controls__back:disabled,
+.screen-controls__next:disabled,
+.screen-controls__back[aria-disabled="true"],
+.screen-controls__next[aria-disabled="true"] {
+  opacity: .4;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.screen-controls__back[aria-disabled="true"]:hover,
+.screen-controls__next[aria-disabled="true"]:hover {
+  border-color: var(--color-border);
+  filter: none;
 }
 
 /* Eyebrow — uppercase mono label shared across sections */
@@ -336,7 +328,7 @@ p {
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-1) var(--space-3);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-1) 0 var(--space-2);
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--color-border);
@@ -347,7 +339,9 @@ p {
 .banner__mark {
   font-weight: 400;
   font-size: 1rem;
+  line-height: 1.35;
   color: var(--color-muted);
+  margin: 0;
 }
 
 .banner__verified {
@@ -881,12 +875,17 @@ p {
 .reckoner {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+}
+
+.reckoner__label,
+.reckoner__estimate {
+  line-height: 1.4;
 }
 
 .reckoner__label {
@@ -902,7 +901,7 @@ p {
 
 .reckoner__chip {
   min-height: 44px;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-bg);
@@ -968,33 +967,387 @@ p {
   color: var(--color-muted);
 }
 
-/* --------------------------------------------------------- Welcome-back (TRD-11) */
-.welcome-back {
+/* ------------------------------------------------------------- Home screen */
+/* Compact hub: independence strip, condensed money hero, reckoner, then the
+   action block (Start + phase menu + save control + privacy). The hook,
+   reckoner and Start sit above the fold at 390x844; the menu/save/privacy may
+   fall below on the shortest phones. */
+#screen-home {
+  gap: var(--space-2);
+}
+
+#screen-home .hero {
+  gap: var(--space-1);
+}
+
+/* Home trims the shared hero so the money hook, reckoner and Start clear the
+   390x844 fold (TRD-1.3). The figure stays the dominant element; the headline
+   and subhead are tightened, never below the 18px body floor. */
+#screen-home .hero__headline {
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+#screen-home .hero__figure {
+  font-size: clamp(2rem, 8vw, 2.6rem);
+}
+
+#screen-home .hero__subhead {
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.home__action {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.home__heading {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.home__reassure {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.home__start {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: filter .2s var(--ease-soft), transform .12s var(--ease-soft);
+}
+
+.home__start:hover,
+.home__start:focus-visible {
+  filter: brightness(1.06);
+}
+
+.home__start:active {
+  transform: translateY(1px);
+}
+
+.home__menu-wrap {
+  margin: 0;
+}
+
+.home__menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.home__menu-item {
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
-}
-
-.welcome-back__text {
-  margin: 0;
-  font-weight: 600;
-  flex: 1 1 auto;
-}
-
-.welcome-back__dismiss {
-  min-height: 44px;
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
   color: var(--color-fg);
   font-weight: 600;
+  font-size: 1rem;
   cursor: pointer;
-  flex: none;
+  transition: border-color .2s var(--ease-soft), background .2s var(--ease-soft);
+}
+
+.home__menu-item:hover,
+.home__menu-item:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.home__menu-item:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.home__links {
+  margin: 0;
+}
+
+.home__privacy-link {
+  min-height: 44px;
+  padding: var(--space-2) 0;
+  border: none;
+  background: transparent;
+  color: var(--color-link);
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* -------------------------------------- Free-text builders (TRD-3.2) */
+/* The two tap-first free-text field builders. Reuses the checklist stepper
+   primitives (.checklist__step / __radio / __options / __nav / __summaries) for
+   a consistent look; the classes below add the destination label, the secondary
+   jog-memory reveal, the manual input and the live preview. */
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.builder__field-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.builder__field-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.builder__wizard {
+  gap: var(--space-4);
+}
+
+/* The secondary jog-memory list: more-specific possibilities, revealed inline
+   under the "I'm not sure" option. Set off with an accent rule so it reads as a
+   nested step, never an equal sibling. Hidden until revealed (no animation, so
+   reduced-motion is honoured for free). */
+.builder__jog {
+  margin: var(--space-3) 0 var(--space-2);
+  padding: var(--space-3) 0 var(--space-2) var(--space-4);
+  border-left: 3px solid var(--color-accent-strong);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.builder__jog[hidden] {
+  display: none;
+}
+
+.builder__jog-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.builder__manual-input {
+  margin-top: var(--space-1);
+}
+
+.builder__manual-input[hidden] {
+  display: none;
+}
+
+/* Live preview of the growing paste-ready block. */
+.builder__preview {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.builder__preview-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.builder__preview-text {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--color-fg);
+  overflow-wrap: anywhere;
+}
+
+.builder__preview-text--empty {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.builder__done-note {
+  margin: 0;
+  align-self: center;
+  font-size: 1rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* ---------------------------------- Review two-block model (TRD-3.3) */
+.draft__note {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.draft__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.draft__block:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.draft__block-label {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.draft__block-text {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  padding: var(--space-3);
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm);
+  cursor: text;
+  overflow-wrap: anywhere;
+  transition: border-color .2s var(--ease-soft), background .2s var(--ease-soft);
+}
+
+.draft__block-text:hover,
+.draft__block-text:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  outline: none;
+}
+
+.draft__block-text:focus-visible {
+  border-color: var(--color-accent);
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(232, 85, 127, .18);
+}
+
+.draft__block-gap {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+/* ---------------------------------------------------------------- Modal */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(2, 6, 13, .55);
+}
+
+.modal {
+  width: min(100%, 560px);
+  max-height: calc(100vh - var(--space-6));
+  overflow-y: auto;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal {
+    animation: modal-in .2s var(--ease-soft);
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+.modal__title {
+  margin: 0 0 var(--space-3);
+}
+
+.intro__list {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.modal__btn {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: filter .2s var(--ease-soft), border-color .2s var(--ease-soft);
+}
+
+.modal__btn--primary {
+  border: none;
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.modal__btn--primary:hover,
+.modal__btn--primary:focus-visible {
+  filter: brightness(1.06);
+}
+
+.modal__btn--secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.modal__btn--secondary:hover,
+.modal__btn--secondary:focus-visible {
+  border-color: var(--color-accent);
 }
 
 /* -------------------------------------------------------- Checklist stepper (TRD-10/11/12) */
@@ -1305,6 +1658,284 @@ p {
    over the single-column base above) — header stays full-width (TRD-14). */
 @media (min-width: 720px) {
   .transfer__fields {
+    grid-template-columns: repeat(2, 1fr);
+    align-items: start;
+  }
+}
+
+/* ------------------------------------------------- Part timebox (TRD-2.5) */
+/* Real, visible AA-contrast text restating a Part's honest time estimate under
+   its heading — never a title-only attribute. */
+.part__timebox {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  letter-spacing: .02em;
+  color: var(--color-muted);
+}
+
+/* --------------------------------------------- Redirect screen (TRD-2.4) */
+/* The advisory "gather this first" screen. Procedural only — names what to
+   collect, never characterises conduct or predicts an outcome. */
+.redirect__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.redirect__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.redirect__item-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-fg);
+}
+
+.redirect__item-detail {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--color-fg);
+}
+
+.redirect__note {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+  max-width: 62ch;
+}
+
+.redirect__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* ------------------------------------------------- Shared action buttons */
+/* Reusable primary/secondary buttons (redirect actions, and future screens).
+   Clears the 44px tap floor with a visible focus ring in both themes. */
+.btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn--primary {
+  border: none;
+  background: var(--color-accent-strong);
+  color: var(--color-on-accent);
+}
+
+.btn--primary:hover,
+.btn--primary:focus-visible {
+  filter: brightness(1.06);
+}
+
+.btn--secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.btn--secondary:hover,
+.btn--secondary:focus-visible {
+  border-color: var(--color-accent);
+}
+
+/* ============================================ IP-4: Transfer/End + cheat-sheet */
+
+/* Long composed prose / labels never force horizontal scroll. */
+.transfer__block-text,
+.cheatsheet__value {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------- Transfer two Copy blocks (4.3) */
+.transfer__intro {
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
+  max-width: 64ch;
+}
+
+.transfer__blocks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.transfer__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.transfer__block-head {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--color-fg);
+}
+
+.transfer__block-field {
+  color: var(--color-link);
+}
+
+.transfer__block-text {
+  white-space: pre-wrap;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.transfer__block-text--empty {
+  color: var(--color-muted);
+  font-style: italic;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+.transfer__block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ------------------------------------------------------ Cheat-sheet (4.2) */
+.cheatsheet {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.cheatsheet__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.cheatsheet__note {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.cheatsheet__list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cheatsheet__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.cheatsheet__row:first-child {
+  border-top: none;
+}
+
+.cheatsheet__label {
+  margin: 0;
+  flex: 1 1 44%;
+  min-width: 12ch;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.cheatsheet__value {
+  margin: 0;
+  flex: 1 1 44%;
+  color: var(--color-fg);
+}
+
+.cheatsheet__value--pending {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* ------------------------------------------------- Transfer end actions (4.4/4.5) */
+.transfer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.transfer__save,
+.transfer__open {
+  min-height: 44px;
+}
+
+.transfer__open {
+  text-decoration: none;
+}
+
+.transfer__open:hover,
+.transfer__open:focus-visible {
+  text-decoration: none;
+}
+
+.transfer__save-status {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-muted);
+  min-height: 1.6em;
+}
+
+.transfer__step-field {
+  font-weight: 600;
+  color: var(--color-link);
+}
+
+/* -------------------------------------------------------- Neutral toast (4.3) */
+.toast--neutral {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+  border-color: var(--color-border);
+  color: var(--color-fg);
+}
+
+/* Two-column Copy blocks on wide viewports. */
+@media (min-width: 720px) {
+  .transfer__blocks {
     grid-template-columns: repeat(2, 1fr);
     align-items: start;
   }

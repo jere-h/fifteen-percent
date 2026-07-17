@@ -66,6 +66,8 @@ export function renderSafety(rootEl, onClear) {
   panel.appendChild(eyebrow);
 
   const heading = el('h2', 'safety__heading', 'Before you start, read this');
+  heading.id = 'safety-panel-title'; // labels the safety dialog (modal.js)
+  heading.tabIndex = -1; // focus target when opened as a dialog
   panel.appendChild(heading);
 
   // --- Honest device-trail caveats ---------------------------------------
