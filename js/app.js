@@ -21,7 +21,7 @@ import {
 } from './store.js';
 import { money, estimateForBand } from './data.js';
 import { renderChecklist } from './checklist.js';
-import { renderRedirect } from './gate.js';
+import { renderRedirect, evaluateGate } from './gate.js';
 import { renderPartHeaders, renderBuilder } from './builders.js';
 import { renderDraft } from './draft.js';
 import { renderTransfer } from './transfer.js';
@@ -71,10 +71,30 @@ function updateHeroFigure(draft) {
 // locked until the reader has been through the readiness check AND either passed
 // the advisory gate or explicitly chosen to continue past the redirect. This
 // keeps the Home menu consistent with the in-flow gate (TRD-2.4).
+//
+// The pass/fail check itself is LIVE (TRD-5.11): it calls the pure, already-
+// exported evaluateGate(draft) fresh on every call rather than trusting the
+// CACHED gate.passed boolean last written by finishReadiness()/
+// acknowledgeRedirect() — whichever last ran. Without this, editing a
+// previously-answered crucial readiness item (e.g. via a "Checked so far ->
+// Edit" link) in a way that would now fail the gate left gate.passed stale,
+// so the Home menu stayed incorrectly unlocked. gate.evaluated (has the
+// reader run the finish action at least once) and gate.acknowledgedRedirect
+// (a deliberate past choice to continue past a failed gate) both still read
+// from the cached draft.readiness.gate exactly as before — only the pass/fail
+// check becomes live.
+//
+// Scoped ONLY to this Home re-entry gate: it is NOT wired into readiness's
+// stepper finish.isEnabled (js/checklist.js / js/stepper.js), which correctly
+// stays on the narrower readinessCrucialAnswered check, and Part 1/Part 2/
+// Assembly/Transfer's own internal Back/Next and "go to my draft" CTAs never
+// call this function at all — they navigate directly via showScreen(), so a
+// live-failing gate can never strand a user already mid-flow, only relock
+// Home's own menu buttons for RE-ENTRY from Home.
 function menuReachable(draft) {
   const gate = (draft && draft.readiness && draft.readiness.gate) || {};
   const readinessComplete = !!(
-    gate.evaluated && (gate.passed || gate.acknowledgedRedirect)
+    gate.evaluated && (evaluateGate(draft).passed || gate.acknowledgedRedirect)
   );
   return {
     readiness: true,

@@ -14,6 +14,11 @@
 //   showScreen(name, { focus })   -> void   (focus defaults to true)
 //   getScreen()                   -> string
 //   setControls({ back, next, onBack, onNext }) -> void  (per-screen override)
+//   clearControls()               -> void   (TRD-5.2: a REAL reset — discards
+//                                    any active override so the control bar
+//                                    falls back entirely to the plain
+//                                    FLOW-derived Back/Menu/Next; distinct from
+//                                    the no-op setControls(null))
 
 import { openModal, closeModal } from './modal.js';
 
@@ -24,9 +29,20 @@ const SCREENS = ['home', 'readiness', 'redirect', 'part1', 'part2', 'assembly', 
 // Linear next/prev map. readiness<->part1 skip 'redirect'; the gate may still
 // send the user to 'redirect', whose Back returns to readiness.
 const FLOW = {
-  home: { next: 'readiness' },
+  // No 'next' key: Home's persistent Next is inert by the same fallback logic
+  // that already disables transfer's (TRD-5.3). The only ways from Home to
+  // Readiness are the Start button (opens the intro modal) and the Home
+  // phase-menu's own "Readiness check" item — never the persistent bar.
+  home: {},
   readiness: { prev: 'home', next: 'part1' },
   redirect: { prev: 'readiness', next: 'part1' },
+  // part1.prev is 'readiness', NOT 'redirect' — confirmed intentional
+  // (TRD-5.12). 'redirect' is a detour off the main linear Back-chain,
+  // reachable only via the readiness gate's fail branch
+  // (checklist.js's finishReadiness), never as a screen a user Back-navigates
+  // through. So Back from part1 always returns to readiness, whether the
+  // reader arrived via Redirect's "Continue anyway" or via a passing gate
+  // straight from Readiness.
   part1: { prev: 'readiness', next: 'part2' },
   part2: { prev: 'part1', next: 'assembly' },
   assembly: { prev: 'part2', next: 'transfer' },
@@ -99,9 +115,9 @@ function applyControls() {
         };
   }
 
-  // --- Menu (always returns Home) ----------------------------------------
+  // --- Home (always returns Home; labelled "Home", TRD-5.4) ---------------
   if (menuBtn) {
-    menuBtn.textContent = 'Menu';
+    menuBtn.textContent = 'Home';
     menuBtn.onclick = function () {
       showScreen('home');
     };
@@ -180,6 +196,17 @@ export function getScreen() {
  */
 export function setControls(next) {
   overrides = Object.assign({}, overrides || {}, next || {});
+  applyControls();
+}
+
+/**
+ * Discard any active per-screen control override and re-apply the plain
+ * FLOW-derived Back/Menu/Next for the current screen (TRD-5.2). This is a
+ * REAL reset — distinct from setControls(null), which merges {} onto whatever
+ * `overrides` already held and therefore changes nothing.
+ */
+export function clearControls() {
+  overrides = null;
   applyControls();
 }
 
