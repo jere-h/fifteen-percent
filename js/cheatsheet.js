@@ -12,7 +12,7 @@
 // reminder NOT_YET.
 
 // The single honest reminder for anything the reader has not yet confirmed.
-export const NOT_YET = 'Not yet — find this out before you submit';
+export const NOT_YET = 'Not yet. Worth finding out before you submit';
 
 function answers(draft) {
   return (draft && draft.readiness && draft.readiness.answers) || {};

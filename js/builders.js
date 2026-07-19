@@ -133,7 +133,7 @@ function buildPromptBody(cfg, prompt, index, total, answers, commit, nav) {
   stepEl.dataset.prompt = prompt.id;
 
   stepEl.appendChild(
-    el('p', 'builder__step-counter', 'Prompt ' + (index + 1) + ' of ' + total)
+    el('p', 'builder__step-counter', 'Question ' + (index + 1) + ' of ' + total)
   );
 
   const promptId = 'builder-prompt-' + cfg.key + '-' + prompt.id;
@@ -201,11 +201,11 @@ function buildJogBody(cfg, prompt, unsure, index, answers, commit, nav) {
   stepEl.dataset.prompt = prompt.id;
 
   stepEl.appendChild(
-    el('p', 'builder__step-counter', 'Prompt ' + (index + 1) + ' — more options')
+    el('p', 'builder__step-counter', 'Question ' + (index + 1) + ' — more options')
   );
 
   const titleId = 'builder-jog-title-' + cfg.key + '-' + prompt.id;
-  const title = el('p', 'checklist__prompt', 'A bit more specific — which is closest?');
+  const title = el('p', 'checklist__prompt', 'Which of these is closest?');
   title.id = titleId;
   stepEl.appendChild(title);
 
@@ -331,7 +331,7 @@ export function renderBuilder(rootEl, draft, key, onChange) {
 
   // Which form field this builds — the reader always knows the destination.
   rootEl.appendChild(
-    el('p', 'builder__field-label', 'Drafting the form field:')
+    el('p', 'builder__field-label', 'You are answering this form field:')
   );
   rootEl.appendChild(el('p', 'builder__field-name', '“' + cfg.fieldLabel + '”'));
 
@@ -353,12 +353,12 @@ export function renderBuilder(rootEl, draft, key, onChange) {
 
   // Live preview of the growing block — a read-only "document" the app writes.
   const preview = el('div', 'builder__preview');
-  preview.appendChild(el('p', 'builder__preview-label', 'Your paste-ready text — read-only'));
+  preview.appendChild(el('p', 'builder__preview-label', 'Your text so far'));
   preview.appendChild(
     el(
       'p',
       'builder__preview-note',
-      'The app writes this as you tap. You’ll copy it into the form at the end — no need to type here.'
+      'This builds up as you answer. You’ll copy it into the form at the end, so there’s nothing to type here.'
     )
   );
   const previewText = el('p', 'builder__preview-text');
@@ -392,7 +392,7 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     label.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
     label.appendChild(
       document.createTextNode(
-        ' answered' + (n === total ? ' — every prompt is done.' : '')
+        ' answered' + (n === total ? ' — all done.' : '')
       )
     );
     progress.appendChild(label);
@@ -412,7 +412,7 @@ export function renderBuilder(rootEl, draft, key, onChange) {
       previewText.classList.remove('builder__preview-text--empty');
     } else {
       previewText.textContent =
-        'Nothing yet — as you tap, the words for this field build up here.';
+        'Nothing yet. Your answers will turn into text here.';
       previewText.classList.add('builder__preview-text--empty');
     }
   }
@@ -528,7 +528,7 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     const body = buildPromptBody(cfg, prompt, index, ctx.total, answers, commit, nav);
     stepHost.appendChild(body);
 
-    announce('Prompt ' + (index + 1) + ' of ' + ctx.total + ': ' + (prompt.prompt || ''));
+    announce('Question ' + (index + 1) + ' of ' + ctx.total + ': ' + (prompt.prompt || ''));
 
     if (focusIt) {
       const p = body.querySelector('.checklist__prompt');

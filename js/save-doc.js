@@ -35,7 +35,7 @@ function rewardPhrase(draft) {
   if (typeof est === 'number' && isFinite(est) && est > 0) {
     return money.phrase(est);
   }
-  return money.ceilingPhrase + ", at IRAS's discretion, never a promise";
+  return money.ceilingPhrase + ", at IRAS's discretion (not guaranteed)";
 }
 
 /**

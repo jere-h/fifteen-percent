@@ -226,7 +226,7 @@ export function renderChecklist(rootEl, draft, onChange) {
     el(
       'p',
       'checklist__intro',
-      'The things people often haven’t sorted out before they file.'
+      'Three quick questions to make sure you have what the form asks for.'
     )
   );
 
@@ -256,7 +256,7 @@ export function renderChecklist(rootEl, draft, onChange) {
     label.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
     label.appendChild(
       document.createTextNode(
-        ' checked' + (n === total ? ' — you have been through every item.' : '')
+        ' checked' + (n === total ? ' — all done.' : '')
       )
     );
     progress.appendChild(label);

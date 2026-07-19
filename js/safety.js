@@ -85,7 +85,7 @@ export function renderSafety(rootEl, onClear) {
   // look closable only via "Clear my data"). This closes the dialog and returns
   // the reader to where they were. The × in the corner does the same.
   const doneWrap = el('div', 'safety__done-wrap');
-  const doneBtn = el('button', 'btn btn--primary safety__done', 'Done — back to where I was');
+  const doneBtn = el('button', 'btn btn--primary safety__done', 'Done, take me back');
   doneBtn.type = 'button';
   doneBtn.addEventListener('click', () => {
     closeModal();
@@ -136,14 +136,14 @@ export function renderSaveControl(rootEl) {
 
   const text = el('span', 'save-disclaimer__text');
   text.appendChild(
-    el('span', 'save-disclaimer__title', 'Saved on this device only — never sent anywhere.')
+    el('span', 'save-disclaimer__title', 'Saved on this device only.')
   );
   text.appendChild(
     el(
       'span',
       'save-disclaimer__help',
       canStore
-        ? 'Close the tab and pick up where you left off. Your answers stay in this browser; nothing reaches any server.'
+        ? 'Close the tab and pick up where you left off. Your answers stay in this browser and are never sent anywhere.'
         : 'This browser is in private mode or full, so your work stays in memory only and will not survive a reload. Nothing reaches any server either way.'
     )
   );

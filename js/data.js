@@ -54,9 +54,9 @@ export const readiness = {
       kind: "verify",
       crucial: "what",
       prompt: "Can you describe what they did, and roughly when?",
-      hint: "Even an approximate account and time period is enough to begin — the app helps you word it later.",
+      hint: "Rough is fine. You'll get help wording it in the next step.",
       gap: "What happened, and roughly when",
-      recommend: "Note down what they did and an approximate time period. Even a rough account is enough to begin — the app helps you word it later.",
+      recommend: "Note down what they did and a rough time period. It doesn't need to be precise; the wording comes later.",
     },
     {
       id: "howKnown",
@@ -107,7 +107,7 @@ export const iras = {
 export const money = {
   ceiling: 100000,
   rate: 0.15,
-  caveat: "a discretionary reward, never a promise",
+  caveat: "a discretionary reward, not guaranteed",
   ceilingPhrase: "up to ~S$100,000",
   // Bare "up to ~S$X" figure (whole dollars, en-SG grouping).
   format(n) {
@@ -116,7 +116,7 @@ export const money = {
   // Figure + discretion caveat, e.g. "up to ~S$30,000, at IRAS's discretion,
   // never a promise".
   phrase(n) {
-    return this.format(n) + ", at IRAS's discretion, never a promise";
+    return this.format(n) + ", at IRAS's discretion (not guaranteed)";
   },
 };
 
@@ -163,7 +163,7 @@ export const freeTextBuilders = {
       {
         id: "kind",
         prompt: "What kind of tax evasion does this involve?",
-        hint: "Pick the closest fit — the app turns it into a sentence.",
+        hint: "Pick whichever is closest.",
         sentence: (f) => "This report concerns " + f + ".",
         options: [
           {
@@ -304,7 +304,7 @@ export const freeTextBuilders = {
         // is gone; a rough band IS the answer here.
         id: "amounts",
         prompt: "Roughly how much was involved, if you know?",
-        hint: "A rough band is fine — exact figures are not needed. Pick “I don't know” to skip.",
+        hint: "A rough range is fine. Pick “I don't know” to skip.",
         sentence: (f) => "On scale, " + f + ".",
         options: [
           {
@@ -335,7 +335,7 @@ export const freeTextBuilders = {
       {
         id: "timing",
         prompt: "When did this happen?",
-        hint: "Even an approximate period helps.",
+        hint: "Roughly is fine.",
         sentence: (f) => "As for timing, " + f + ".",
         options: [
           {
