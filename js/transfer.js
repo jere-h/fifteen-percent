@@ -104,10 +104,24 @@ function revealSelectable(textEl) {
   }
 }
 
+// Brief on-button confirmation so the feedback appears right where the reader
+// clicked (the toast still fires for screen readers and peripheral vision).
+function flashCopied(btn) {
+  if (!btn) return;
+  if (!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent;
+  btn.classList.add('is-copied');
+  btn.textContent = '✓ Copied';
+  clearTimeout(btn.__copiedTimer);
+  btn.__copiedTimer = setTimeout(function () {
+    btn.classList.remove('is-copied');
+    btn.textContent = btn.dataset.origLabel;
+  }, 2000);
+}
+
 // The single copy path. Honest by construction: empty -> neutral toast, never
 // "Copied"; a real write -> "Copied" only on a true resolution; a failure ->
 // "Copy failed" + selectable fallback.
-function doCopy(text, textEl) {
+function doCopy(text, textEl, btn) {
   const value = text == null ? '' : String(text).trim();
   if (value === '') {
     showNeutralToast('Nothing to copy yet');
@@ -117,6 +131,7 @@ function doCopy(text, textEl) {
     function (ok) {
       if (ok) {
         showToast('Copied');
+        flashCopied(btn);
       } else {
         showFailedToast('Copy failed — the text is selected, press ' + copyChord() + ' to copy it');
         revealSelectable(textEl);
@@ -183,7 +198,7 @@ function buildCopyBlock(key, block) {
   copyBtn.type = 'button';
   copyBtn.setAttribute('aria-label', 'Copy the text for the form field: ' + block.label);
   copyBtn.addEventListener('click', function () {
-    doCopy(hasText ? block.text : '', textEl);
+    doCopy(hasText ? block.text : '', textEl, copyBtn);
   });
   actions.appendChild(copyBtn);
 
