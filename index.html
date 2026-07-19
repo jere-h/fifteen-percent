@@ -118,9 +118,12 @@
 
   <!-- ================================================ Persistent controls -->
   <nav id="screen-controls" aria-label="Screen navigation">
-    <button type="button" class="screen-controls__back" id="ctl-back">&larr; Back</button>
-    <button type="button" class="screen-controls__menu" id="ctl-menu">Home</button>
-    <button type="button" class="screen-controls__next" id="ctl-next">Next &rarr;</button>
+    <div class="flow-progress" id="flow-progress" hidden></div>
+    <div class="screen-controls__row">
+      <button type="button" class="screen-controls__back" id="ctl-back">&larr; Back</button>
+      <button type="button" class="screen-controls__menu" id="ctl-menu">Home</button>
+      <button type="button" class="screen-controls__next" id="ctl-next">Next &rarr;</button>
+    </div>
   </nav>
 
   <!-- Off-screen host for the safety panel; opened inside the accessible modal -->

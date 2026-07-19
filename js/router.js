@@ -56,6 +56,16 @@ const SCREEN_LABELS = {
   transfer: 'Copy into the IRAS form',
 };
 
+// The four phases of the overall journey, for the slim progress strip that sits
+// above the persistent control bar. Home shows no strip (the bar is hidden
+// there); every in-flow screen maps to exactly one phase.
+const PHASES = [
+  { label: 'Readiness', screens: ['readiness', 'redirect'] },
+  { label: 'What happened', screens: ['part1'] },
+  { label: 'How you know', screens: ['intro2', 'part2'] },
+  { label: 'Review & copy', screens: ['assembly', 'transfer'] },
+];
+
 let current = 'home';
 // Per-screen control overrides, cleared on every navigation.
 let overrides = null;
@@ -83,6 +93,42 @@ function setDisabled(btn, disabled) {
     btn.removeAttribute('aria-disabled');
     btn.classList.remove('is-disabled');
   }
+}
+
+// Paint the four-phase journey strip for the screen being shown. Hidden on
+// Home (the whole control bar is hidden there anyway).
+function renderFlowProgress(name) {
+  const host = el('flow-progress');
+  if (!host) return;
+  const idx = PHASES.findIndex((p) => p.screens.indexOf(name) !== -1);
+  if (idx === -1) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  host.textContent = '';
+
+  const caption = document.createElement('p');
+  caption.className = 'flow-progress__caption';
+  caption.textContent =
+    'Phase ' + (idx + 1) + ' of ' + PHASES.length + ' — ' + PHASES[idx].label;
+  host.appendChild(caption);
+
+  const track = document.createElement('div');
+  track.className = 'flow-progress__track';
+  track.setAttribute('aria-hidden', 'true');
+  PHASES.forEach(function (p, i) {
+    const seg = document.createElement('span');
+    seg.className =
+      'flow-progress__seg' +
+      (i < idx
+        ? ' flow-progress__seg--done'
+        : i === idx
+          ? ' flow-progress__seg--current'
+          : '');
+    track.appendChild(seg);
+  });
+  host.appendChild(track);
 }
 
 // Rebuild the Back / Menu / Next bar from the current screen's FLOW entry plus
@@ -157,6 +203,12 @@ export function showScreen(name, opts) {
     const s = screens[i];
     s.hidden = s.id !== 'screen-' + name;
   }
+
+  // Home has its own Start button and nothing for Back/Next to do, so the
+  // persistent bar only appears once the reader is inside the flow.
+  const controls = el('screen-controls');
+  if (controls) controls.hidden = name === 'home';
+  renderFlowProgress(name);
 
   // Instant scroll reset (behavior:'auto' is inherently reduced-motion safe).
   try {

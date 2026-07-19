@@ -388,12 +388,20 @@ export function renderBuilder(rootEl, draft, key, onChange) {
   function updateProgress() {
     const n = answeredCount();
     progress.textContent = '';
-    progress.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
-    progress.appendChild(
+    const label = el('p', 'checklist__progress-label');
+    label.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
+    label.appendChild(
       document.createTextNode(
         ' answered' + (n === total ? ' — every prompt is done.' : '')
       )
     );
+    progress.appendChild(label);
+    const track = el('div', 'stepbar');
+    track.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < total; i++) {
+      track.appendChild(el('span', 'stepbar__seg' + (i < n ? ' stepbar__seg--done' : '')));
+    }
+    progress.appendChild(track);
   }
 
   function updatePreview() {

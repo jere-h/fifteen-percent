@@ -252,12 +252,20 @@ export function renderChecklist(rootEl, draft, onChange) {
   function updateProgress() {
     const n = answeredReadinessCount(draft);
     progress.textContent = '';
-    progress.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
-    progress.appendChild(
+    const label = el('p', 'checklist__progress-label');
+    label.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
+    label.appendChild(
       document.createTextNode(
         ' checked' + (n === total ? ' — you have been through every item.' : '')
       )
     );
+    progress.appendChild(label);
+    const track = el('div', 'stepbar');
+    track.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < total; i++) {
+      track.appendChild(el('span', 'stepbar__seg' + (i < n ? ' stepbar__seg--done' : '')));
+    }
+    progress.appendChild(track);
   }
 
   // stepperApi is assigned once createStepper() below returns; the "Edit" links
