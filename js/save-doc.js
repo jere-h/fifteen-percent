@@ -22,7 +22,7 @@ const FILENAME = 'fifteen-percent-report.txt';
 // strings.
 function attachmentLines() {
   return [
-    'Attach anything you kept — invoices, messages, records or screenshots.',
+    'Attach anything you kept: invoices, messages, records or screenshots.',
     'If you have nothing to attach, your written account above is the record.',
   ];
 }
@@ -51,14 +51,14 @@ export function buildDocument(draft) {
   const thin = '-'.repeat(60);
   const out = [];
 
-  out.push('FIFTEEN PERCENT — MY IRAS REPORT NOTES');
+  out.push('FIFTEEN PERCENT: MY IRAS REPORT NOTES');
   out.push(rule);
   out.push('');
   out.push(
     'Independent tool, not affiliated with IRAS. This file was built on your own'
   );
   out.push(
-    'device and nothing here has been sent anywhere. It is your working copy —'
+    'device and nothing here has been sent anywhere. It is your working copy;'
   );
   out.push('paste it into the official form yourself. This tool never submits.');
   out.push('');
@@ -84,7 +84,7 @@ export function buildDocument(draft) {
   // Readiness recap — what to be ready with before opening the form.
   out.push(thin);
   out.push('BEFORE YOU OPEN THE FORM, BE READY TO');
-  out.push('(a recap of your readiness check — not text to paste)');
+  out.push('(a recap of your readiness check, not text to paste)');
   out.push(thin);
   sheet.forEach((row) => {
     out.push('- ' + row.label + ': ' + row.value);
