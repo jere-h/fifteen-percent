@@ -90,23 +90,23 @@ export function renderRedirect(rootEl, draft, handlers) {
   const heading = screen.querySelector('#redirect-heading');
 
   if (result.passed) {
-    if (eyebrow) eyebrow.textContent = 'Readiness — done';
+    if (eyebrow) eyebrow.textContent = 'Check done';
     if (heading) heading.textContent = 'You have what the form needs';
     body.appendChild(
       el(
         'p',
         'screen__lead',
-        'You can name who is involved, describe what happened, and point to how you know. That is enough to file a useful report.'
+        'You can say who is involved, what happened, and how you know. That is enough for a useful report.'
       )
     );
   } else {
-    if (eyebrow) eyebrow.textContent = 'Readiness — almost there';
-    if (heading) heading.textContent = 'You can start — a couple of things to firm up';
+    if (eyebrow) eyebrow.textContent = 'Almost there';
+    if (heading) heading.textContent = 'You can start, but a couple of things are worth firming up';
     body.appendChild(
       el(
         'p',
         'screen__lead',
-        'You can still continue now and fill these in on the form itself, but a stronger report covers each of them. Here is what would help before you file:'
+        'You can carry on now and fill these in on the form itself. A stronger report covers them, though, so before you file it helps to know:'
       )
     );
 
@@ -123,7 +123,7 @@ export function renderRedirect(rootEl, draft, handlers) {
   // The breather that introduces the next phase (issue 9): the reader always
   // knows exactly what comes next before they proceed.
   const nextUp = el('div', 'phase-intro');
-  nextUp.appendChild(el('span', 'phase-intro__kicker', 'Next in the drafting'));
+  nextUp.appendChild(el('span', 'phase-intro__kicker', 'Up next'));
   nextUp.appendChild(
     el('span', 'phase-intro__name', 'What happened')
   );
@@ -131,9 +131,9 @@ export function renderRedirect(rootEl, draft, handlers) {
     el(
       'span',
       'phase-intro__desc',
-      'Tap through a few choices and the app writes the wording for you. About 5 minutes. Use ' +
+      'A few quick questions about what actually went on. Your answers become the write-up. About 5 minutes. Hit ' +
         (result.passed ? '“Begin →”' : '“Continue anyway →”') +
-        ' below when you are ready, or Back to revisit the check.'
+        ' below when you’re ready, or Back to change the check.'
     )
   );
   body.appendChild(nextUp);
@@ -141,7 +141,7 @@ export function renderRedirect(rootEl, draft, handlers) {
   announce(
     result.passed
       ? 'You have what the form needs. Next, what happened.'
-      : 'You can start. A couple of things to firm up first: ' +
+      : 'You can start. A couple of things worth firming up first: ' +
           gaps.map((g) => g.title).join('; ') +
           '.'
   );

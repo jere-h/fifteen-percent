@@ -160,13 +160,13 @@ function rewardPhrase(draft) {
   if (typeof est === 'number' && isFinite(est) && est > 0) {
     return money.phrase(est);
   }
-  return money.ceilingPhrase + ", at IRAS's discretion, never a promise";
+  return money.ceilingPhrase + ", at IRAS's discretion (not guaranteed)";
 }
 
 // A neutral attachments reminder. The form handles attachments itself, so this
 // simply prompts the reader to bring whatever they kept.
 function attachmentSummary() {
-  return 'Attach anything you kept — invoices, messages, records or screenshots. If you have nothing to attach, your written account is the record.';
+  return 'Attach anything you kept: invoices, messages, records, screenshots. If you have nothing to attach, your written account is enough.';
 }
 
 // One Copy block for a free-text field: exact form-field heading, the composed
@@ -177,7 +177,7 @@ function buildCopyBlock(key, block) {
   const headId = 'transfer-block-head-' + key;
   const heading = el('h3', 'transfer__block-head');
   heading.id = headId;
-  heading.appendChild(document.createTextNode('Copy, then paste into the form field: '));
+  heading.appendChild(document.createTextNode('For the form field: '));
   heading.appendChild(el('span', 'transfer__block-field', '“' + block.label + '”'));
   section.appendChild(heading);
 
@@ -194,7 +194,7 @@ function buildCopyBlock(key, block) {
   section.appendChild(textEl);
 
   const actions = el('div', 'transfer__block-actions');
-  const copyBtn = el('button', 'transfer__copy', 'Copy this block');
+  const copyBtn = el('button', 'transfer__copy', 'Copy this text');
   copyBtn.type = 'button';
   copyBtn.setAttribute('aria-label', 'Copy the text for the form field: ' + block.label);
   copyBtn.addEventListener('click', function () {
@@ -248,10 +248,10 @@ export function renderTransfer(rootEl, draft) {
   const cue = el('p', 'transfer__ready-cue');
   cue.setAttribute('role', 'status');
   if (bothReady) {
-    cue.textContent = 'Both blocks are drafted. Open the IRAS form and follow these three steps:';
+    cue.textContent = 'Both answers are written. Open the IRAS form and do three things:';
   } else {
     cue.textContent =
-      filled.length + ' of ' + KEYS.length + ' blocks drafted so far. You can still open the form now. ';
+      filled.length + ' of ' + KEYS.length + ' answers written so far. You can still open the form now. ';
     const link = el('button', 'transfer__recognition-link', 'Finish the other part');
     link.type = 'button';
     link.addEventListener('click', function () {
@@ -261,16 +261,16 @@ export function renderTransfer(rootEl, draft) {
   }
   ready.appendChild(cue);
 
-  ready.appendChild(el('p', 'transfer__ready-title', 'Three steps on the form:'));
+  ready.appendChild(el('p', 'transfer__ready-title', 'On the form:'));
   const steps = el('ol', 'transfer__ready-steps');
   const step1 = el('li');
-  step1.appendChild(document.createTextNode('Paste block 1 into '));
+  step1.appendChild(document.createTextNode('Paste your first answer into '));
   step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft1.label + '”'));
-  step1.appendChild(document.createTextNode(', and block 2 into '));
+  step1.appendChild(document.createTextNode(' and your second into '));
   step1.appendChild(el('span', 'transfer__step-field', '“' + model.ft2.label + '”'));
-  step1.appendChild(document.createTextNode(' — both are just below.'));
+  step1.appendChild(document.createTextNode('. Both are just below.'));
   steps.appendChild(step1);
-  steps.appendChild(el('li', null, 'Fill the simple choices yourself — the recap at the foot of this page reminds you what to have ready.'));
+  steps.appendChild(el('li', null, 'Fill in the simple fields yourself. The recap at the bottom of this page lists what to have handy.'));
   const step3 = el('li');
   step3.appendChild(document.createTextNode('Attach your supporting files. ' + attachmentSummary()));
   steps.appendChild(step3);
@@ -280,7 +280,7 @@ export function renderTransfer(rootEl, draft) {
     el(
       'p',
       'transfer__ready-reward',
-      'If IRAS recovers tax, an informant reward is possible: ' + rewardPhrase(safe) + '.'
+      'If IRAS recovers tax, you may get an informant reward: ' + rewardPhrase(safe) + '.'
     )
   );
 
@@ -317,7 +317,7 @@ export function renderTransfer(rootEl, draft) {
     el(
       'p',
       'transfer__attach-note',
-      'The IRAS form opens in a new tab. Independent tool — not affiliated with IRAS. This app never submits or uploads anything for you; you paste and attach everything yourself.'
+      'The form opens in a new tab. This tool is not affiliated with IRAS and never submits anything for you. You paste and attach everything yourself.'
     )
   );
 

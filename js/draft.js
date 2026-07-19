@@ -199,7 +199,7 @@ export function renderCheatSheet(draft, idPrefix) {
     el(
       'p',
       'cheatsheet__note',
-      'A quick recap of your readiness check — not text to paste.'
+      'A reminder of what to have handy. This is not text to paste.'
     )
   );
 
@@ -236,7 +236,7 @@ export function renderDraft(rootEl, draft, onEdit) {
 
   rootEl.appendChild(el('p', 'eyebrow', 'Review your draft'));
 
-  const heading = el('h2', null, 'Your two paste-ready blocks');
+  const heading = el('h2', null, 'Read over your two answers');
   heading.id = 'draft-heading';
   heading.tabIndex = -1; // focus target on screen switch (router)
   rootEl.appendChild(heading);
@@ -246,7 +246,7 @@ export function renderDraft(rootEl, draft, onEdit) {
   if (!filled.length) {
     const empty = el('div', 'draft__empty');
     empty.setAttribute('role', 'status');
-    empty.appendChild(el('p', null, 'Draft the two parts to build your report'));
+    empty.appendChild(el('p', null, 'Answer the two question sets to build your report'));
     const cta = el('button', 'draft__empty-cta', 'Start drafting');
     cta.type = 'button';
     cta.addEventListener('click', () => {
@@ -258,7 +258,7 @@ export function renderDraft(rootEl, draft, onEdit) {
     const partial = el('p', 'draft__recognition');
     partial.setAttribute('role', 'status');
     partial.appendChild(
-      document.createTextNode(filled.length + ' of ' + KEYS.length + ' blocks drafted so far. ')
+      document.createTextNode(filled.length + ' of ' + KEYS.length + ' answers written so far. ')
     );
     const missing = model.ft1.text.trim() !== '' ? 'part2' : 'part1';
     const back = el('button', 'draft__recognition-link', 'Finish the other part');
@@ -267,7 +267,6 @@ export function renderDraft(rootEl, draft, onEdit) {
       showScreen(missing);
     });
     partial.appendChild(back);
-    partial.appendChild(document.createTextNode(' — your report grows as you go.'));
     rootEl.appendChild(partial);
   }
 
@@ -278,7 +277,7 @@ export function renderDraft(rootEl, draft, onEdit) {
       el(
         'p',
         'draft__note',
-        'Tap a block to reword it — your edits are kept.'
+        'Tap either one to reword it. Your edits are kept.'
       )
     );
 
