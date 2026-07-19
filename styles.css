@@ -48,6 +48,12 @@
   --shadow-md: 0 2px 4px -1px rgba(2, 6, 13, .05);
   --shadow-lg: 0 6px 16px -4px rgba(2, 6, 13, .08);
 
+  /* Accent gradient + glow, shared by primary actions, badges and progress
+     fills so the whole page draws from one warm rose ramp. */
+  --grad-accent: linear-gradient(135deg, #d4547e 0%, #b8446a 55%, #a93a8f 100%);
+  --shadow-accent: 0 8px 20px -8px rgba(184, 68, 106, .55);
+  --glow-opacity: .16;
+
   /* Responsive */
   --bp-wide: 720px;
 
@@ -75,6 +81,8 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
     --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, .35);
     --shadow-lg: 0 6px 16px -4px rgba(0, 0, 0, .5);
+    --shadow-accent: 0 8px 22px -8px rgba(232, 85, 127, .45);
+    --glow-opacity: .22;
 
     color-scheme: dark;
   }
@@ -2143,6 +2151,148 @@ body.modal-open {
   .transfer__blocks {
     grid-template-columns: repeat(2, 1fr);
     align-items: start;
+  }
+}
+
+/* ============================================================ Visual layer */
+/* A decorative pass over the whole page: one warm rose gradient ramp shared by
+   primary actions, badges and progress fills, an ambient glow behind the home
+   hero, and gentle hover lifts. Pure decoration; nothing here changes layout,
+   copy or behaviour, and the reduced-motion guard above still zeroes every
+   transition. */
+
+::selection {
+  background: rgba(232, 85, 127, .25);
+}
+
+/* --- Ambient hero glow (home only). The same warm orb the draft empty state
+   uses, parked behind the headline so the page opens with some light. */
+#screen-home {
+  position: relative;
+  isolation: isolate;
+}
+
+#screen-home::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -70px;
+  left: 50%;
+  width: min(720px, 110%);
+  aspect-ratio: 1.5;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side,
+      #ffd9a8 0%,
+      #f7849b 40%,
+      #e8557f 68%,
+      transparent 100%);
+  filter: blur(80px);
+  opacity: var(--glow-opacity);
+  pointer-events: none;
+}
+
+/* --- The 15% in the hook picks up the gradient ramp (with a solid-colour
+   fallback where background-clip:text is unsupported). */
+#screen-home .hero__rate {
+  color: var(--color-link);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  #screen-home .hero__rate {
+    background: var(--grad-text, var(--grad-accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* --- Primary actions share the gradient + a soft rose glow. */
+.home__start,
+.screen-controls__next,
+.btn--primary,
+.transfer__copy-all,
+.draft__empty-cta,
+.modal__btn--primary {
+  background: var(--grad-accent);
+  border-color: transparent;
+  box-shadow: var(--shadow-accent);
+}
+
+.home__start:hover,
+.screen-controls__next:hover,
+.btn--primary:hover,
+.modal__btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+.screen-controls__next[aria-disabled="true"] {
+  box-shadow: none;
+}
+
+/* --- Phase cards: gradient hairline on top, gradient number badge, hover
+   lift. The whole card reads as one crafted unit instead of a plain box. */
+.phase-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  transition: transform .2s var(--ease-soft), box-shadow .2s var(--ease-soft);
+}
+
+.phase-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--grad-accent);
+  opacity: .9;
+}
+
+.phase-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.phase-card__num {
+  background: var(--grad-accent);
+  box-shadow: var(--shadow-accent);
+}
+
+/* --- Progress fills draw from the same ramp. */
+.flow-progress__seg--done,
+.stepbar__seg--done {
+  background: var(--grad-accent);
+}
+
+/* --- Question cards and the live preview: a touch more radius and depth so
+   the working surfaces feel layered above the page. */
+.checklist__step {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.builder__preview {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Modal + toast get a frosted backdrop. */
+.modal__backdrop {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.toast {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Dark theme: the gradient text ramp lightens so it stays readable on the
+   near-black background (the button ramp keeps its white-text contrast). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grad-text: linear-gradient(135deg, #ffb199 0%, #f27a9c 55%, #d886e0 100%);
   }
 }
 
