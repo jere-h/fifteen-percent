@@ -133,12 +133,12 @@ function doCopy(text, textEl, btn) {
         showToast('Copied');
         flashCopied(btn);
       } else {
-        showFailedToast('Copy failed — the text is selected, press ' + copyChord() + ' to copy it');
+        showFailedToast('Copy failed. The text is selected, press ' + copyChord() + ' to copy it');
         revealSelectable(textEl);
       }
     },
     function () {
-      showFailedToast('Copy failed — the text is selected, press ' + copyChord() + ' to copy it');
+      showFailedToast('Copy failed. The text is selected, press ' + copyChord() + ' to copy it');
       revealSelectable(textEl);
     }
   );
@@ -302,7 +302,7 @@ export function renderTransfer(rootEl, draft) {
     const ok = downloadDocument(safe);
     if (ok) {
       saveStatus.textContent =
-        'Saved to your device as fifteen-percent-report.txt — nothing was sent anywhere.';
+        'Saved to your device as fifteen-percent-report.txt. Nothing was sent anywhere.';
     } else {
       saveStatus.textContent =
         'Could not start the download in this browser. Copy each block below instead.';

@@ -39,7 +39,7 @@ function applyPart(key) {
 
   const heading = document.getElementById(key + '-heading');
   if (heading) {
-    heading.textContent = cfg.name + ' — ' + cfg.estimate;
+    heading.textContent = cfg.name + ' (' + cfg.estimate + ')';
   }
 }
 
@@ -201,7 +201,7 @@ function buildJogBody(cfg, prompt, unsure, index, answers, commit, nav) {
   stepEl.dataset.prompt = prompt.id;
 
   stepEl.appendChild(
-    el('p', 'builder__step-counter', 'Question ' + (index + 1) + ' — more options')
+    el('p', 'builder__step-counter', 'Question ' + (index + 1) + ', more options')
   );
 
   const titleId = 'builder-jog-title-' + cfg.key + '-' + prompt.id;
@@ -392,7 +392,7 @@ export function renderBuilder(rootEl, draft, key, onChange) {
     label.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
     label.appendChild(
       document.createTextNode(
-        ' answered' + (n === total ? ' — all done.' : '')
+        ' answered' + (n === total ? ', all done.' : '')
       )
     );
     progress.appendChild(label);

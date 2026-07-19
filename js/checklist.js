@@ -218,7 +218,7 @@ export function renderChecklist(rootEl, draft, onChange) {
 
   // --- heading (name + estimate, single-sourced from data.js) ------------
   // The time lives in the heading; no separate description line beneath it.
-  const heading = el('h2', null, part.name + ' — ' + part.estimate);
+  const heading = el('h2', null, part.name + ' (' + part.estimate + ')');
   heading.id = 'checklist-heading';
   heading.tabIndex = -1; // focus target on screen switch (router)
   rootEl.appendChild(heading);
@@ -256,7 +256,7 @@ export function renderChecklist(rootEl, draft, onChange) {
     label.appendChild(el('span', 'checklist__progress-count', n + ' of ' + total));
     label.appendChild(
       document.createTextNode(
-        ' checked' + (n === total ? ' — all done.' : '')
+        ' checked' + (n === total ? ', all done.' : '')
       )
     );
     progress.appendChild(label);

@@ -111,7 +111,7 @@ function renderFlowProgress(name) {
   const caption = document.createElement('p');
   caption.className = 'flow-progress__caption';
   caption.textContent =
-    'Phase ' + (idx + 1) + ' of ' + PHASES.length + ' — ' + PHASES[idx].label;
+    'Phase ' + (idx + 1) + ' of ' + PHASES.length + ': ' + PHASES[idx].label;
   host.appendChild(caption);
 
   const track = document.createElement('div');

@@ -74,7 +74,7 @@ export function renderSafety(rootEl, onClear) {
       'span',
       'safety__disclaimer-help',
       canStore
-        ? 'Your answers are kept in this browser so you can close the tab and come back — they are never sent to any server. Anyone using this device could open them, so use "Clear all my data" below when you are done.'
+        ? 'Your answers are kept in this browser so you can close the tab and come back. They are never sent to any server. Anyone using this device could open them, so use "Clear all my data" below when you are done.'
         : 'Storage is unavailable in this browser (private mode or full), so your work stays in memory only and will not survive a reload. Nothing is ever sent anywhere.'
     )
   );
