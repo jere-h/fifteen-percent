@@ -49,9 +49,9 @@ const SCREEN_LABELS = {
   home: 'Home',
   readiness: 'Readiness check',
   redirect: 'Readiness result',
-  part1: 'Part 1: What happened',
-  intro2: 'Next: Part 2',
-  part2: 'Part 2: How you became aware',
+  part1: 'What happened',
+  intro2: 'Next: How you know',
+  part2: 'How you became aware',
   assembly: 'Review your draft',
   transfer: 'Copy into the IRAS form',
 };

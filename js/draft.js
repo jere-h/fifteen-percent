@@ -247,7 +247,7 @@ export function renderDraft(rootEl, draft, onEdit) {
     const empty = el('div', 'draft__empty');
     empty.setAttribute('role', 'status');
     empty.appendChild(el('p', null, 'Draft the two parts to build your report'));
-    const cta = el('button', 'draft__empty-cta', 'Start Part 1');
+    const cta = el('button', 'draft__empty-cta', 'Start drafting');
     cta.type = 'button';
     cta.addEventListener('click', () => {
       showScreen('part1');

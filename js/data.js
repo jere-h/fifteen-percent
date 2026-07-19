@@ -44,8 +44,10 @@ export const readiness = {
       crucial: "who",
       prompt: "Do you know who to report — a name for the person or business?",
       hint: "Ideally also an address, NRIC/FIN or UEN. Without at least a name, IRAS has little to act on.",
-      // Group label surfaced on the resolution screen when this is thin.
-      gap: "who is involved — at least a name",
+      // Short label + a plain recommendation, surfaced on the resolution screen
+      // when this is thin. `gap` is the heading; `recommend` is what would help.
+      gap: "Who is involved",
+      recommend: "Try to pin down a name for the person or business — and, if you can, an address, NRIC/FIN or UEN. Without at least a name, IRAS has little to act on.",
     },
     {
       id: "whatKnown",
@@ -53,7 +55,8 @@ export const readiness = {
       crucial: "what",
       prompt: "Can you describe what they did, and roughly when?",
       hint: "Even an approximate account and time period is enough to begin — the app helps you word it later.",
-      gap: "what happened, and roughly when",
+      gap: "What happened, and roughly when",
+      recommend: "Note down what they did and an approximate time period. Even a rough account is enough to begin — the app helps you word it later.",
     },
     {
       id: "howKnown",
@@ -61,7 +64,8 @@ export const readiness = {
       crucial: "how",
       prompt: "Do you have something to point to, or a first-hand account of how you know?",
       hint: "Documents you kept (invoices, messages, records) — or simply what you saw or handled yourself.",
-      gap: "how you know — anything you can point to",
+      gap: "How you know",
+      recommend: "Think about what you can point to: invoices, messages or records you kept, or simply what you saw or handled yourself.",
     },
   ],
 };
@@ -72,8 +76,8 @@ export const readiness = {
 // The three estimates (~3 + ~5 + ~4) reconcile with the intro modal's ~12 mins.
 // ---------------------------------------------------------------------------
 export const parts = {
-  part1: { name: "Part 1: What happened", estimate: "~5 mins" },
-  part2: { name: "Part 2: How you know", estimate: "~4 mins" },
+  part1: { name: "What happened", estimate: "~5 mins" },
+  part2: { name: "How you know", estimate: "~4 mins" },
 };
 
 // ---------------------------------------------------------------------------

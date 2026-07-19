@@ -136,7 +136,7 @@ function renderRedirectScreen() {
   });
   const passed = evaluateGate(currentDraft).passed;
   setControls({
-    next: { label: passed ? 'Begin Part 1 →' : 'Continue anyway →' },
+    next: { label: passed ? 'Begin →' : 'Continue anyway →' },
     onNext: acknowledgeRedirect,
   });
 }
@@ -284,7 +284,7 @@ function boot() {
     if (e.detail.name === 'redirect') {
       renderRedirectScreen();
     } else if (e.detail.name === 'intro2') {
-      setControls({ next: { label: 'Begin Part 2 →' } });
+      setControls({ next: { label: 'Begin →' } });
     }
   });
 }

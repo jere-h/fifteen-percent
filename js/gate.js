@@ -52,7 +52,7 @@ export function gateGaps(draft) {
   const a = answers(draft);
   return crucialItems()
     .filter((it) => a[it.id] !== 'have')
-    .map((it) => ({ id: it.id, title: it.gap || it.prompt }));
+    .map((it) => ({ id: it.id, title: it.gap || it.prompt, detail: it.recommend || it.hint || '' }));
 }
 
 function el(tag, className, text) {
@@ -106,7 +106,7 @@ export function renderRedirect(rootEl, draft, handlers) {
       el(
         'p',
         'screen__lead',
-        'You can still continue now and add these on the form itself, but a stronger report names each of them. You may want to find out more about:'
+        'You can still continue now and fill these in on the form itself, but a stronger report covers each of them. Here is what would help before you file:'
       )
     );
 
@@ -114,6 +114,7 @@ export function renderRedirect(rootEl, draft, handlers) {
     gaps.forEach((gap) => {
       const li = el('li', 'redirect__item');
       li.appendChild(el('span', 'redirect__item-title', gap.title));
+      if (gap.detail) li.appendChild(el('span', 'redirect__item-detail', gap.detail));
       list.appendChild(li);
     });
     body.appendChild(list);
@@ -122,7 +123,7 @@ export function renderRedirect(rootEl, draft, handlers) {
   // The breather that introduces the next phase (issue 9): the reader always
   // knows exactly what comes next before they proceed.
   const nextUp = el('div', 'phase-intro');
-  nextUp.appendChild(el('span', 'phase-intro__kicker', 'Next — Part 1 of the drafting'));
+  nextUp.appendChild(el('span', 'phase-intro__kicker', 'Next in the drafting'));
   nextUp.appendChild(
     el('span', 'phase-intro__name', 'What happened')
   );
@@ -131,7 +132,7 @@ export function renderRedirect(rootEl, draft, handlers) {
       'span',
       'phase-intro__desc',
       'Tap through a few choices and the app writes the wording for you. About 5 minutes. Use ' +
-        (result.passed ? '“Begin Part 1 →”' : '“Continue anyway →”') +
+        (result.passed ? '“Begin →”' : '“Continue anyway →”') +
         ' below when you are ready, or Back to revisit the check.'
     )
   );
@@ -139,7 +140,7 @@ export function renderRedirect(rootEl, draft, handlers) {
 
   announce(
     result.passed
-      ? 'You have what the form needs. Next, Part 1: what happened.'
+      ? 'You have what the form needs. Next, what happened.'
       : 'You can start. A couple of things to firm up first: ' +
           gaps.map((g) => g.title).join('; ') +
           '.'
