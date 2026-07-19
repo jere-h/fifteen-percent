@@ -1024,6 +1024,71 @@ p {
   color: var(--color-link);
 }
 
+/* Reward, as a compact scannable stat instead of a paragraph clause. A tight
+   bordered chip carries the two figures; the discretion caveat sits just below
+   it as a small caption, so the honesty is kept without bloating the hero. */
+.hero__reward {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.hero__reward-chip {
+  display: inline-block;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-fg);
+  line-height: 1.4;
+}
+
+.hero__reward-chip .hero__rate {
+  font-size: 1.15em;
+}
+
+/* Each fact stays whole; the chip wraps only between the two facts. */
+.hero__reward-fact {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Middle dot separating the two reward facts on one line. */
+.hero__reward-dot {
+  display: inline-block;
+  margin: 0 var(--space-2);
+  color: var(--color-border);
+  font-weight: 700;
+}
+
+.hero__reward-dot::before {
+  content: "·";
+}
+
+/* On narrow screens the chip would wrap and strand the dot, so stack the two
+   facts cleanly and drop the separator instead. */
+@media (max-width: 520px) {
+  .hero__reward-fact {
+    display: block;
+  }
+
+  .hero__reward-dot {
+    display: none;
+  }
+}
+
+.hero__reward-note {
+  font-size: .82rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+  max-width: 60ch;
+}
+
 /* --------------------------------------------------- Phases overview (home) */
 .phases {
   display: flex;
